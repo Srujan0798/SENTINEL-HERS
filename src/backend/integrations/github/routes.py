@@ -5,16 +5,15 @@ import os
 import uuid
 from datetime import datetime
 
-from fastapi import APIRouter, Depends, Header, HTTPException, Request, status
+from fastapi import APIRouter, Depends, Header, HTTPException, Query, Request, status
 from sqlalchemy.orm import Session
 
 from src.backend.auth.dependencies import get_current_user_dependency
 from src.backend.db import get_db
 from src.backend.integrations.github.models import Commit, Deployment
+from src.backend.shared_models import TeamModel
 
 router = APIRouter(prefix="/api/integrations", tags=["integrations"])
-
-_PLACEHOLDER_TEAM = "00000000-0000-0000-0000-000000000001"
 
 
 def _verify_github_sig(body: bytes, sig_header: str | None) -> None:
@@ -28,11 +27,30 @@ def _verify_github_sig(body: bytes, sig_header: str | None) -> None:
         raise HTTPException(status_code=401, detail="Invalid GitHub signature")
 
 
+def _resolve_team(db: Session, team_id: str | None) -> str:
+    """Resolve and validate the destination team for an incoming webhook.
+
+    The team is taken from the `team_id` configured on the webhook URL and must
+    correspond to a real team. We reject unknown teams rather than writing to a
+    placeholder so deployments/commits are always correctly tenant-scoped.
+
+    NOTE: the webhook secret is currently shared; binding a per-team secret at
+    registration time is the next hardening step (see docs/SECURITY.md).
+    """
+    if not team_id:
+        raise HTTPException(status_code=400, detail="team_id query parameter is required")
+    team = db.query(TeamModel).filter(TeamModel.id == str(team_id)).first()
+    if not team:
+        raise HTTPException(status_code=404, detail="Unknown team_id")
+    return str(team.id)
+
+
 @router.post("/github/webhook", status_code=status.HTTP_202_ACCEPTED)
 async def github_webhook(
     request: Request,
     x_hub_signature_256: str | None = Header(None),
     x_github_event: str | None = Header(None),
+    team_id: str | None = Query(None, description="Destination team (set on the webhook URL)"),
     db: Session = Depends(get_db),
 ):
     body = await request.body()
@@ -44,7 +62,7 @@ async def github_webhook(
         raise HTTPException(status_code=400, detail="Invalid JSON")
 
     event = x_github_event or ""
-    team_id = _PLACEHOLDER_TEAM
+    team_id = _resolve_team(db, team_id)
 
     if event in ("deployment", "deployment_status"):
         dep_data = payload.get("deployment", payload.get("deployment_status", {}))
@@ -99,6 +117,7 @@ async def gitlab_webhook(
     request: Request,
     x_gitlab_token: str | None = Header(None),
     x_gitlab_event: str | None = Header(None),
+    team_id: str | None = Query(None, description="Destination team (set on the webhook URL)"),
     db: Session = Depends(get_db),
 ):
     expected = os.getenv("GITLAB_WEBHOOK_SECRET", "")
@@ -111,7 +130,7 @@ async def gitlab_webhook(
         raise HTTPException(status_code=400, detail="Invalid JSON")
 
     event = x_gitlab_event or payload.get("object_kind", "")
-    team_id = _PLACEHOLDER_TEAM
+    team_id = _resolve_team(db, team_id)
 
     if event in ("deployment", "Deployment Hook"):
         dep = Deployment(

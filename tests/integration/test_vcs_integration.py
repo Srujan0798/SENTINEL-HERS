@@ -89,6 +89,7 @@ class TestGitHubWebhook:
         resp = client.post(
             "/api/integrations/github/webhook",
             content=body,
+            params={"team_id": auth["team_id"]},
             headers={"X-Hub-Signature-256": sig, "X-GitHub-Event": "deployment", "Content-Type": "application/json"},
         )
         assert resp.status_code == 202
@@ -109,6 +110,7 @@ class TestGitHubWebhook:
         resp = client.post(
             "/api/integrations/github/webhook",
             content=body,
+            params={"team_id": auth["team_id"]},
             headers={"X-Hub-Signature-256": sig, "X-GitHub-Event": "push", "Content-Type": "application/json"},
         )
         assert resp.status_code == 202
@@ -128,13 +130,24 @@ class TestGitHubWebhook:
         resp = client.post(
             "/api/integrations/github/webhook",
             content=body,
+            params={"team_id": auth["team_id"]},
             headers={"X-Hub-Signature-256": sig, "X-GitHub-Event": "star", "Content-Type": "application/json"},
         )
         assert resp.status_code == 202
 
+    def test_missing_team_rejected(self, auth):
+        body = b'{}'
+        sig = _github_sig(body)
+        resp = client.post(
+            "/api/integrations/github/webhook",
+            content=body,
+            headers={"X-Hub-Signature-256": sig, "X-GitHub-Event": "push", "Content-Type": "application/json"},
+        )
+        assert resp.status_code == 400  # team_id query param required
+
 
 class TestGitLabWebhook:
-    def test_push_event_accepted(self):
+    def test_push_event_accepted(self, auth):
         payload = {
             "object_kind": "push",
             "project": {"name": "frontend"},
@@ -145,6 +158,7 @@ class TestGitLabWebhook:
         resp = client.post(
             "/api/integrations/gitlab/webhook",
             content=body,
+            params={"team_id": auth["team_id"]},
             headers={"X-Gitlab-Token": "test-gitlab-token", "X-Gitlab-Event": "Push Hook", "Content-Type": "application/json"},
         )
         assert resp.status_code == 202
@@ -170,13 +184,17 @@ class TestDeploymentListing:
         client.post(
             "/api/integrations/github/webhook",
             content=body,
+            params={"team_id": auth["team_id"]},
             headers={"X-Hub-Signature-256": _github_sig(body), "X-GitHub-Event": "deployment", "Content-Type": "application/json"},
         )
 
         resp = client.get("/api/integrations/deployments", headers=auth["headers"])
         assert resp.status_code == 200
-        # Note: webhook uses placeholder team_id, auth uses different team_id — list may be empty
-        assert isinstance(resp.json(), list)
+        data = resp.json()
+        assert isinstance(data, list)
+        # Webhook is now tenant-scoped to the team on the URL, so the deployment
+        # the same team seeded must be visible in its listing.
+        assert any(d.get("sha") == "xyz999" for d in data)
 
     def test_list_commits(self, auth):
         resp = client.get("/api/integrations/commits", headers=auth["headers"])

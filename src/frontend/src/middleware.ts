@@ -33,16 +33,10 @@ export function middleware(request: NextRequest) {
     return NextResponse.redirect(new URL("/dashboard", request.url));
   }
 
-  const response = NextResponse.next();
-
-  if (accessToken) {
-    response.headers.set("x-access-token", accessToken);
-  }
-  if (refreshToken) {
-    response.headers.set("x-refresh-token", refreshToken);
-  }
-
-  return response;
+  // Note: we deliberately do NOT echo tokens into response headers — that would
+  // leak credentials to client JS / proxies. Server components needing the token
+  // read it from the cookie directly in their own handler.
+  return NextResponse.next();
 }
 
 export const config = {
