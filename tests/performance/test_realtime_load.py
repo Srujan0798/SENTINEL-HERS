@@ -16,7 +16,7 @@ import pytest
 import uvicorn
 from fastapi import FastAPI
 
-from src.backend.auth.service import create_access_token, db, hash_password
+from src.backend.auth.service import create_access_token
 from src.backend.realtime.hub import ConnectionEntry, RealtimeHub, get_hub
 from src.backend.realtime.router import router as realtime_router
 
@@ -40,34 +40,8 @@ def _create_test_app() -> FastAPI:
     return app
 
 
-def _seed_test_user():
-    role_id = str(uuid.uuid4())
-    db.roles[role_id] = {"id": role_id, "name": "admin", "permissions": ["*"], "description": "test"}
-    db.users[TEST_USER_ID] = {
-        "id": TEST_USER_ID,
-        "team_id": TEST_TEAM_ID,
-        "email": f"loadtest-{uuid.uuid4().hex[:8]}@sentinel.dev",
-        "password_hash": hash_password("testpass123"),
-        "name": "Load Test User",
-        "avatar_url": None,
-        "role_id": role_id,
-        "is_active": True,
-        "last_login_at": None,
-        "created_at": None,
-        "updated_at": None,
-    }
-    db.teams[TEST_TEAM_ID] = {
-        "id": TEST_TEAM_ID,
-        "name": "Load Test Team",
-        "slug": "load-test-team",
-        "description": None,
-        "settings": {},
-        "created_at": None,
-        "updated_at": None,
-    }
-
-
-_seed_test_user()
+# Realtime SSE/WS auth is token-only (decodes team_id from the signed JWT, no DB
+# lookup per connection), so the load test just needs a valid signed token.
 _token = create_access_token(TEST_USER_ID, TEST_TEAM_ID, "admin")
 
 
