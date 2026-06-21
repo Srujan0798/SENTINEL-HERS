@@ -1,0 +1,51 @@
+groups:
+  - name: sentinel_api
+    rules:
+      - alert: HighErrorRate
+        expr: rate(sentinel_http_requests_total{status=~"5.."}[5m]) > 0.05
+        for: 2m
+        labels:
+          severity: critical
+        annotations:
+          summary: "SENTINEL API error rate high ({{ $value | humanize }} req/s)"
+          description: "5xx error rate exceeded 5% for 2 minutes on {{ $labels.path }}"
+
+      - alert: HighLatency
+        expr: histogram_quantile(0.99, rate(sentinel_http_request_duration_seconds_bucket[5m])) > 2
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "SENTINEL API p99 latency > 2s"
+          description: "p99 latency is {{ $value | humanizeDuration }} on {{ $labels.path }}"
+
+      - alert: APIDown
+        expr: up{job="sentinel-api"} == 0
+        for: 1m
+        labels:
+          severity: critical
+        annotations:
+          summary: "SENTINEL API is down"
+          description: "The SENTINEL API has been unreachable for > 1 minute"
+
+  - name: sentinel_incidents
+    rules:
+      - alert: TooManyOpenIncidents
+        expr: sentinel_active_incidents_total{severity="SEV1"} > 3
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "More than 3 open SEV1 incidents"
+          description: "{{ $value }} SEV1 incidents are currently open"
+
+  - name: sentinel_anomaly
+    rules:
+      - alert: AnomalyDetected
+        expr: sentinel_anomaly_score_bucket{le="0.3"} / ignoring(le) sentinel_anomaly_score_count < 0.1
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Anomalous behaviour detected in {{ $labels.service }}"
+          description: "IsolationForest anomaly score is in critical range for service {{ $labels.service }}"

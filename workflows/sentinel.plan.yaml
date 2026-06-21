@@ -1,0 +1,182 @@
+$schema: https://os-setup.io/schemas/workflow.v1.json
+name: sentinel
+description: >
+  Master wave/task DAG for SENTINEL — AI-Native Engineering Operations Platform.
+  Orchestrator (Tier 1) writes task files from this plan; external AI agents (Tier 2)
+  execute. Each task declares disjoint write-sets (FM-13) + forbid-sets + blast-radius +
+  executable acceptance. Workers NEVER touch files outside their `writes` set.
+
+archetype: hackathon+saas-product
+tier: T2
+state_file: orchestrator/memory/states/sentinel-state.json
+
+# ----------------------------------------------------------------------------------
+# PARALLELISM LAW (FM-13): tasks within the same wave have DISJOINT `writes` sets and
+# may run in parallel. Cross-wave dependencies are explicit via `depends_on`.
+# Wave-0 is the SHARED SPINE — single-threaded, owns the contracts everyone builds on.
+# ----------------------------------------------------------------------------------
+
+waves:
+
+  - id: wave-0
+    name: Foundation & Contracts (THE SPINE — sequential, one owner)
+    goal: Monorepo, docker-compose, DB schema, OpenAPI contract, design system, CI, seed data.
+    judging: System Design & Scalability, Deployment & DevOps
+    parallel: false
+    blast_radius: r1
+    tasks:
+      - id: "00-repo-and-compose"
+        writes: [docker-compose.yml, Dockerfile.api, Dockerfile.frontend, Makefile, .env.example, .github/workflows/]
+        acceptance: "docker compose up builds; healthcheck on /healthz returns 200"
+      - id: "01-db-schema-and-contracts"
+        writes: [schema/, .specify/specs/wave-0/contracts/, docs/schemas/]
+        acceptance: "alembic upgrade head succeeds; OpenAPI spec lints; ERD generated"
+      - id: "02-design-system"
+        writes: [src/frontend/ui/, src/frontend/theme/, docs/flows/design-system.md]
+        acceptance: "shadcn theme renders; Storybook (or component gallery) builds"
+
+  - id: wave-1
+    name: Auth + RBAC + Teams
+    goal: Team-based authentication with role-based access control. The security spine.
+    judging: Security & Access Control (15%)
+    depends_on: [wave-0]
+    parallel: true
+    blast_radius: r1
+    tasks:
+      - id: "01-auth-backend"
+        writes: [src/backend/auth/, tests/unit/test_auth.py]
+        acceptance: "JWT issue/verify; refresh; pytest tests/unit/test_auth.py green"
+      - id: "02-rbac-policy"
+        writes: [src/backend/rbac/, tests/integration/test_rbac.py]
+        acceptance: "roles owner/responder/viewer enforced; 403 on under-privilege"
+      - id: "03-auth-frontend"
+        writes: [src/frontend/app/(auth)/, src/frontend/lib/auth.ts]
+        acceptance: "login/logout flow; protected routes redirect; e2e login passes"
+
+  - id: wave-2
+    name: Real-Time Incident Dashboard + Severity/Triage + Realtime Infra
+    goal: Live incident board with severity classification, triage, SSE/WebSocket transport.
+    judging: Real-Time Features & Reliability (20%), UI/UX (10%)
+    depends_on: [wave-1]
+    parallel: true
+    blast_radius: r1
+    tasks:
+      - id: "01-realtime-transport"
+        writes: [src/backend/realtime/, src/frontend/lib/realtime.ts]
+        acceptance: "SSE stream pushes event <1s; reconnect on drop; load test 500 conn"
+      - id: "02-incident-model-and-api"
+        writes: [src/backend/incidents/, tests/integration/test_incidents.py]
+        acceptance: "CRUD + severity enum (SEV1-4) + triage state machine; tests green"
+      - id: "03-dashboard-ui"
+        writes: [src/frontend/app/dashboard/, src/frontend/components/incident/]
+        acceptance: "board renders live incidents; severity colour-coded; triage drag"
+
+  - id: wave-3
+    name: Log & Alert Monitoring + Service Health / Uptime
+    goal: Centralised log/alert ingestion interface + uptime visualisation.
+    judging: Real-Time Features & Reliability, System Design
+    depends_on: [wave-1]
+    parallel: true
+    blast_radius: r1
+    tasks:
+      - id: "01-log-ingestion"
+        writes: [src/backend/logs/, src/backend/ingest/]
+        acceptance: "ingest endpoint accepts log/alert payloads; indexed search <500ms"
+      - id: "02-service-health"
+        writes: [src/backend/health/, prometheus.yml]
+        acceptance: "uptime probes recorded; Prometheus scrapes /metrics"
+      - id: "03-monitoring-ui"
+        writes: [src/frontend/app/monitoring/, src/frontend/components/health/]
+        acceptance: "log stream view + uptime sparklines render live"
+
+  - id: wave-4
+    name: AI Layer — Summaries, Root-Cause, Chatbot, Postmortem
+    goal: AI-generated incident summaries, root-cause suggestions, NL chatbot over logs/incidents.
+    judging: AI Integration & Automation (20%)
+    depends_on: [wave-2, wave-3]
+    parallel: true
+    blast_radius: r1
+    tasks:
+      - id: "01-ai-summary-rootcause"
+        writes: [src/backend/ai/summary/, src/backend/ai/rootcause/]
+        acceptance: "given seeded incident+logs, returns summary+ranked causes; eval pass@5>=50%"
+      - id: "02-ai-chatbot-rag"
+        writes: [src/backend/ai/chat/, src/frontend/components/chat/]
+        acceptance: "NL query 'why did api-gw fail at 02:00' returns grounded answer w/ citations"
+      - id: "03-auto-postmortem"
+        writes: [src/backend/ai/postmortem/, docs/operational/postmortem-template.md]
+        acceptance: "incident -> structured postmortem MD with timeline + causes + actions"
+
+  - id: wave-5
+    name: Integrations — GitHub/GitLab Deploy & Commit Tracking + Timeline/Provenance
+    goal: Deployment+commit tracking; incident timeline with full event provenance.
+    judging: AI Integration & Automation, System Design
+    depends_on: [wave-2]
+    parallel: true
+    blast_radius: r3   # external API calls -> confirm tokens
+    tasks:
+      - id: "01-vcs-integration"
+        writes: [src/backend/integrations/github/, src/backend/integrations/gitlab/]
+        acceptance: "webhook ingests deploy+commit events; links commit->incident"
+      - id: "02-timeline-provenance"
+        writes: [src/backend/timeline/, src/frontend/components/timeline/]
+        acceptance: "every timeline event carries source+actor+ts; immutable log"
+
+  - id: wave-6
+    name: Task Assignment + Escalation + SLA Workflow + Per-Incident Comms
+    goal: Assign/escalate tasks, SLA-aware workflow, integrated comm channel per incident.
+    judging: System Design, Real-Time, UI/UX
+    depends_on: [wave-2, wave-1]
+    parallel: true
+    blast_radius: r1
+    tasks:
+      - id: "01-task-sla-engine"
+        writes: [src/backend/tasks/, src/backend/sla/, tests/integration/test_sla.py]
+        acceptance: "SLA timer + auto-escalation on breach; assignment respects RBAC"
+      - id: "02-incident-comms"
+        writes: [src/backend/comms/, src/frontend/components/comms/]
+        acceptance: "per-incident channel; messages realtime; @mention notifies"
+
+  - id: wave-7
+    name: Analytics + Predictive Anomaly Detection (ML) + K8s/Docker Monitoring
+    goal: Deployment-stability & incident-frequency analytics; ML anomaly detection; container monitoring.
+    judging: System Design & Scalability, AI Integration
+    depends_on: [wave-3, wave-5]
+    parallel: true
+    blast_radius: r1
+    tasks:
+      - id: "01-analytics-dashboard"
+        writes: [src/backend/analytics/, src/frontend/app/analytics/]
+        acceptance: "deploy stability + incident frequency trends; metrics from one source (FM-05)"
+      - id: "02-anomaly-ml"
+        writes: [src/backend/ml/anomaly/, models/]
+        acceptance: "anomaly score on metric stream; flags injected anomaly in eval"
+      - id: "03-container-monitoring"
+        writes: [src/backend/integrations/k8s/, src/backend/integrations/docker/]
+        acceptance: "reads pod/container status; surfaces unhealthy to dashboard"
+
+  - id: wave-8
+    name: Polish — UI/UX, Demo Path, Voice-to-Ticket, Deployment, Observability
+    goal: Harden the sacred demo path; voice-to-ticket; one-command deploy; observability docs.
+    judging: UI/UX & Product Quality (10%), Deployment & DevOps (10%)
+    depends_on: [wave-4, wave-6, wave-7]
+    parallel: true
+    blast_radius: r1
+    tasks:
+      - id: "01-demo-hardening-and-seed"
+        writes: [scripts/seed_demo.py, docs/business/demo_video_script.md]
+        acceptance: "scripts/seed_demo.py replays full demo path end-to-end, zero errors"
+      - id: "02-voice-to-ticket"
+        writes: [src/frontend/components/voice/, src/backend/ai/transcribe/]
+        acceptance: "speech -> incident draft; editable before submit"
+      - id: "03-deploy-and-observability"
+        writes: [docker-compose.prod.yml, docs/operational/OBSERVABILITY.md, docs/operational/PERFORMANCE_SLOS.md]
+        acceptance: "prod compose boots; Grafana dashboard provisioned; SLOs documented"
+
+self_heal:
+  on_acceptance_fail: revise_brief
+  on_flaky: quarantine_and_fix            # FM-10
+  on_stale_process: kill_and_restart      # FM-02
+  on_drift: regenerate_from_source        # FM-01/05/12
+  on_context_full: handoff_and_clear      # FM-04
+  on_parallel_collision: serialize_shared_file_under_one_owner   # FM-13

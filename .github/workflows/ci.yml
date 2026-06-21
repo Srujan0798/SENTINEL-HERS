@@ -1,0 +1,23 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+jobs:
+  lint-test-build:
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Lint
+        run: echo "Lint placeholder — wired by later waves"
+
+      - name: Test
+        run: echo "Test placeholder — wired by later waves"
+
+      - name: Docker compose build
+        run: docker compose build

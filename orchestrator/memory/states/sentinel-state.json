@@ -1,0 +1,67 @@
+{
+  "project": "sentinel",
+  "tier": "T2",
+  "active_wave": "wave-2",
+  "waves": {
+    "wave-0": {
+      "status": "shipped",
+      "tasks": 3,
+      "merged": 3
+    },
+    "wave-1": {
+      "status": "shipped",
+      "tasks": 3,
+      "merged": 3
+    },
+    "wave-2": {
+      "status": "dispatched",
+      "tasks": 3,
+      "merged": 0
+    },
+    "wave-3": {
+      "status": "dispatched",
+      "tasks": 3,
+      "merged": 0
+    },
+    "wave-4": {
+      "status": "pending",
+      "tasks": 3,
+      "merged": 0
+    },
+    "wave-5": {
+      "status": "pending",
+      "tasks": 2,
+      "merged": 0
+    },
+    "wave-6": {
+      "status": "pending",
+      "tasks": 2,
+      "merged": 0
+    },
+    "wave-7": {
+      "status": "pending",
+      "tasks": 3,
+      "merged": 0
+    },
+    "wave-8": {
+      "status": "pending",
+      "tasks": 3,
+      "merged": 0
+    }
+  },
+  "dispatch_order": [
+    "wave-0",
+    "wave-1",
+    [
+      "wave-2",
+      "wave-3"
+    ],
+    [
+      "wave-4",
+      "wave-5",
+      "wave-6"
+    ],
+    "wave-7",
+    "wave-8"
+  ]
+}

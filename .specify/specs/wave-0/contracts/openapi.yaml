@@ -1,0 +1,1985 @@
+openapi: 3.1.0
+info:
+  title: SENTINEL — AI-Native Engineering Operations Platform
+  description: |
+    Unified API for incident management, log monitoring, deployment tracking,
+    AI-assisted debugging, and team collaboration.
+  version: 1.0.0
+  contact:
+    name: SENTINEL Team
+  license:
+    name: MIT
+
+servers:
+  - url: http://localhost:8000/api/v1
+    description: Local development
+  - url: https://api.sentinel.dev/api/v1
+    description: Development
+
+tags:
+  - name: auth
+    description: Authentication & authorization
+  - name: teams
+    description: Team management
+  - name: incidents
+    description: Incident lifecycle management
+  - name: logs
+    description: Log ingestion & search
+  - name: alerts
+    description: Alert management
+  - name: health
+    description: Service health monitoring
+  - name: deployments
+    description: Deployment tracking
+  - name: commits
+    description: Commit & VCS integration
+  - name: timeline
+    description: Timeline events & provenance
+  - name: tasks
+    description: Task assignment & tracking
+  - name: sla
+    description: SLA management
+  - name: channels
+    description: Communication channels
+  - name: messages
+    description: Channel messages
+  - name: ai
+    description: AI-powered features
+  - name: analytics
+    description: Analytics & dashboards
+  - name: integrations
+    description: External integrations
+
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+
+  schemas:
+    # ──────────────────────────────────────────────
+    # Common
+    # ──────────────────────────────────────────────
+    UUID:
+      type: string
+      format: uuid
+
+    Timestamp:
+      type: string
+      format: date-time
+
+    Pagination:
+      type: object
+      properties:
+        page:
+          type: integer
+          minimum: 1
+        per_page:
+          type: integer
+          minimum: 1
+          maximum: 100
+        total:
+          type: integer
+        total_pages:
+          type: integer
+
+    ErrorResponse:
+      type: object
+      required: [error]
+      properties:
+        error:
+          type: string
+        detail:
+          type: string
+        code:
+          type: string
+
+    # ──────────────────────────────────────────────
+    # Teams & Auth
+    # ──────────────────────────────────────────────
+    Team:
+      type: object
+      properties:
+        id:
+          $ref: '#/components/schemas/UUID'
+        name:
+          type: string
+        slug:
+          type: string
+        description:
+          type: string
+        settings:
+          type: object
+        created_at:
+          $ref: '#/components/schemas/Timestamp'
+        updated_at:
+          $ref: '#/components/schemas/Timestamp'
+
+    Role:
+      type: object
+      properties:
+        id:
+          $ref: '#/components/schemas/UUID'
+        name:
+          type: string
+        permissions:
+          type: array
+          items:
+            type: string
+        description:
+          type: string
+
+    User:
+      type: object
+      properties:
+        id:
+          $ref: '#/components/schemas/UUID'
+        team_id:
+          $ref: '#/components/schemas/UUID'
+        email:
+          type: string
+          format: email
+        name:
+          type: string
+        avatar_url:
+          type: string
+          nullable: true
+        role_id:
+          $ref: '#/components/schemas/UUID'
+        role:
+          $ref: '#/components/schemas/Role'
+        is_active:
+          type: boolean
+        last_login_at:
+          $ref: '#/components/schemas/Timestamp'
+        created_at:
+          $ref: '#/components/schemas/Timestamp'
+        updated_at:
+          $ref: '#/components/schemas/Timestamp'
+
+    LoginRequest:
+      type: object
+      required: [email, password]
+      properties:
+        email:
+          type: string
+          format: email
+        password:
+          type: string
+          minLength: 8
+
+    LoginResponse:
+      type: object
+      properties:
+        access_token:
+          type: string
+        refresh_token:
+          type: string
+        token_type:
+          type: string
+          default: bearer
+        expires_in:
+          type: integer
+        user:
+          $ref: '#/components/schemas/User'
+
+    RegisterRequest:
+      type: object
+      required: [email, password, name, team_name]
+      properties:
+        email:
+          type: string
+          format: email
+        password:
+          type: string
+          minLength: 8
+        name:
+          type: string
+        team_name:
+          type: string
+
+    RefreshRequest:
+      type: object
+      required: [refresh_token]
+      properties:
+        refresh_token:
+          type: string
+
+    # ──────────────────────────────────────────────
+    # Incidents
+    # ──────────────────────────────────────────────
+    SeverityLevel:
+      type: string
+      enum: [SEV1, SEV2, SEV3, SEV4]
+
+    IncidentStatus:
+      type: string
+      enum: [detected, triaging, investigating, mitigating, resolved, closed]
+
+    Incident:
+      type: object
+      properties:
+        id:
+          $ref: '#/components/schemas/UUID'
+        team_id:
+          $ref: '#/components/schemas/UUID'
+        title:
+          type: string
+        description:
+          type: string
+        severity:
+          $ref: '#/components/schemas/SeverityLevel'
+        status:
+          $ref: '#/components/schemas/IncidentStatus'
+        assigned_to:
+          $ref: '#/components/schemas/UUID'
+        escalated_to:
+          $ref: '#/components/schemas/UUID'
+        detected_at:
+          $ref: '#/components/schemas/Timestamp'
+        triaged_at:
+          $ref: '#/components/schemas/Timestamp'
+        resolved_at:
+          $ref: '#/components/schemas/Timestamp'
+        closed_at:
+          $ref: '#/components/schemas/Timestamp'
+        root_cause:
+          type: string
+        ai_summary:
+          type: string
+        ai_root_cause_ranking:
+          type: array
+          items:
+            type: object
+            properties:
+              cause:
+                type: string
+              confidence:
+                type: number
+        metadata:
+          type: object
+        created_at:
+          $ref: '#/components/schemas/Timestamp'
+        updated_at:
+          $ref: '#/components/schemas/Timestamp'
+
+    IncidentCreate:
+      type: object
+      required: [title, severity]
+      properties:
+        title:
+          type: string
+          maxLength: 500
+        description:
+          type: string
+        severity:
+          $ref: '#/components/schemas/SeverityLevel'
+        assigned_to:
+          $ref: '#/components/schemas/UUID'
+        metadata:
+          type: object
+
+    IncidentUpdate:
+      type: object
+      properties:
+        title:
+          type: string
+        description:
+          type: string
+        severity:
+          $ref: '#/components/schemas/SeverityLevel'
+        status:
+          $ref: '#/components/schemas/IncidentStatus'
+        assigned_to:
+          $ref: '#/components/schemas/UUID'
+        escalated_to:
+          $ref: '#/components/schemas/UUID'
+        root_cause:
+          type: string
+
+    # ──────────────────────────────────────────────
+    # Logs
+    # ──────────────────────────────────────────────
+    LogLevel:
+      type: string
+      enum: [debug, info, warn, error, fatal]
+
+    LogEntry:
+      type: object
+      properties:
+        id:
+          $ref: '#/components/schemas/UUID'
+        team_id:
+          $ref: '#/components/schemas/UUID'
+        incident_id:
+          $ref: '#/components/schemas/UUID'
+        service:
+          type: string
+        level:
+          $ref: '#/components/schemas/LogLevel'
+        message:
+          type: string
+        metadata:
+          type: object
+        source_ip:
+          type: string
+        indexed_at:
+          $ref: '#/components/schemas/Timestamp'
+        created_at:
+          $ref: '#/components/schemas/Timestamp'
+
+    LogIngest:
+      type: object
+      required: [service, level, message]
+      properties:
+        service:
+          type: string
+        level:
+          $ref: '#/components/schemas/LogLevel'
+        message:
+          type: string
+        metadata:
+          type: object
+        source_ip:
+          type: string
+
+    LogSearchQuery:
+      type: object
+      properties:
+        query:
+          type: string
+        service:
+          type: string
+        level:
+          $ref: '#/components/schemas/LogLevel'
+        start_time:
+          $ref: '#/components/schemas/Timestamp'
+        end_time:
+          $ref: '#/components/schemas/Timestamp'
+        page:
+          type: integer
+        per_page:
+          type: integer
+
+    # ──────────────────────────────────────────────
+    # Alerts
+    # ──────────────────────────────────────────────
+    Alert:
+      type: object
+      properties:
+        id:
+          $ref: '#/components/schemas/UUID'
+        team_id:
+          $ref: '#/components/schemas/UUID'
+        incident_id:
+          $ref: '#/components/schemas/UUID'
+        source:
+          type: string
+        alert_type:
+          type: string
+        title:
+          type: string
+        description:
+          type: string
+        severity:
+          $ref: '#/components/schemas/SeverityLevel'
+        is_resolved:
+          type: boolean
+        resolved_at:
+          $ref: '#/components/schemas/Timestamp'
+        resolved_by:
+          $ref: '#/components/schemas/UUID'
+        fired_at:
+          $ref: '#/components/schemas/Timestamp'
+        created_at:
+          $ref: '#/components/schemas/Timestamp'
+
+    AlertCreate:
+      type: object
+      required: [source, alert_type, title]
+      properties:
+        source:
+          type: string
+        alert_type:
+          type: string
+        title:
+          type: string
+        description:
+          type: string
+        severity:
+          $ref: '#/components/schemas/SeverityLevel'
+        metadata:
+          type: object
+
+    # ──────────────────────────────────────────────
+    # Service Health
+    # ──────────────────────────────────────────────
+    HealthStatus:
+      type: string
+      enum: [healthy, degraded, down, unknown]
+
+    ServiceHealth:
+      type: object
+      properties:
+        id:
+          $ref: '#/components/schemas/UUID'
+        team_id:
+          $ref: '#/components/schemas/UUID'
+        service_name:
+          type: string
+        status:
+          $ref: '#/components/schemas/HealthStatus'
+        uptime_percentage:
+          type: number
+        latency_ms:
+          type: integer
+        last_check_at:
+          $ref: '#/components/schemas/Timestamp'
+        next_check_at:
+          $ref: '#/components/schemas/Timestamp'
+        created_at:
+          $ref: '#/components/schemas/Timestamp'
+        updated_at:
+          $ref: '#/components/schemas/Timestamp'
+
+    ServiceHealthUpdate:
+      type: object
+      required: [service_name, status]
+      properties:
+        service_name:
+          type: string
+        status:
+          $ref: '#/components/schemas/HealthStatus'
+        uptime_percentage:
+          type: number
+        latency_ms:
+          type: integer
+
+    # ──────────────────────────────────────────────
+    # Deployments & Commits
+    # ──────────────────────────────────────────────
+    DeployStatus:
+      type: string
+      enum: [pending, in_progress, success, failed, rolled_back]
+
+    Deployment:
+      type: object
+      properties:
+        id:
+          $ref: '#/components/schemas/UUID'
+        team_id:
+          $ref: '#/components/schemas/UUID'
+        service:
+          type: string
+        version:
+          type: string
+        environment:
+          type: string
+        status:
+          $ref: '#/components/schemas/DeployStatus'
+        deployed_by:
+          $ref: '#/components/schemas/UUID'
+        started_at:
+          $ref: '#/components/schemas/Timestamp'
+        completed_at:
+          $ref: '#/components/schemas/Timestamp'
+        rollback_at:
+          $ref: '#/components/schemas/Timestamp'
+        commit_id:
+          $ref: '#/components/schemas/UUID'
+        created_at:
+          $ref: '#/components/schemas/Timestamp'
+        updated_at:
+          $ref: '#/components/schemas/Timestamp'
+
+    DeploymentCreate:
+      type: object
+      required: [service, version]
+      properties:
+        service:
+          type: string
+        version:
+          type: string
+        environment:
+          type: string
+          default: production
+        metadata:
+          type: object
+
+    Commit:
+      type: object
+      properties:
+        id:
+          $ref: '#/components/schemas/UUID'
+        team_id:
+          $ref: '#/components/schemas/UUID'
+        deployment_id:
+          $ref: '#/components/schemas/UUID'
+        sha:
+          type: string
+        message:
+          type: string
+        author:
+          type: string
+        author_email:
+          type: string
+        branch:
+          type: string
+        repository:
+          type: string
+        committed_at:
+          $ref: '#/components/schemas/Timestamp'
+        created_at:
+          $ref: '#/components/schemas/Timestamp'
+
+    # ──────────────────────────────────────────────
+    # Timeline Events
+    # ──────────────────────────────────────────────
+    TimelineEvent:
+      type: object
+      properties:
+        id:
+          $ref: '#/components/schemas/UUID'
+        incident_id:
+          $ref: '#/components/schemas/UUID'
+        event_type:
+          type: string
+        source:
+          type: string
+        actor:
+          type: string
+        ts:
+          $ref: '#/components/schemas/Timestamp'
+        payload_ref:
+          type: string
+        description:
+          type: string
+        metadata:
+          type: object
+        created_at:
+          $ref: '#/components/schemas/Timestamp'
+
+    TimelineEventCreate:
+      type: object
+      required: [event_type, source, actor]
+      properties:
+        event_type:
+          type: string
+        source:
+          type: string
+        actor:
+          type: string
+        payload_ref:
+          type: string
+        description:
+          type: string
+        metadata:
+          type: object
+
+    # ──────────────────────────────────────────────
+    # Tasks
+    # ──────────────────────────────────────────────
+    TaskStatus:
+      type: string
+      enum: [pending, in_progress, blocked, completed, cancelled]
+
+    Task:
+      type: object
+      properties:
+        id:
+          $ref: '#/components/schemas/UUID'
+        incident_id:
+          $ref: '#/components/schemas/UUID'
+        assigned_to:
+          $ref: '#/components/schemas/UUID'
+        title:
+          type: string
+        description:
+          type: string
+        status:
+          $ref: '#/components/schemas/TaskStatus'
+        priority:
+          type: integer
+          minimum: 1
+          maximum: 5
+        due_at:
+          $ref: '#/components/schemas/Timestamp'
+        completed_at:
+          $ref: '#/components/schemas/Timestamp'
+        completed_by:
+          $ref: '#/components/schemas/UUID'
+        created_at:
+          $ref: '#/components/schemas/Timestamp'
+        updated_at:
+          $ref: '#/components/schemas/Timestamp'
+
+    TaskCreate:
+      type: object
+      required: [title]
+      properties:
+        incident_id:
+          $ref: '#/components/schemas/UUID'
+        assigned_to:
+          $ref: '#/components/schemas/UUID'
+        title:
+          type: string
+          maxLength: 500
+        description:
+          type: string
+        priority:
+          type: integer
+          minimum: 1
+          maximum: 5
+          default: 3
+        due_at:
+          $ref: '#/components/schemas/Timestamp'
+
+    TaskUpdate:
+      type: object
+      properties:
+        assigned_to:
+          $ref: '#/components/schemas/UUID'
+        title:
+          type: string
+        description:
+          type: string
+        status:
+          $ref: '#/components/schemas/TaskStatus'
+        priority:
+          type: integer
+
+    # ──────────────────────────────────────────────
+    # SLA
+    # ──────────────────────────────────────────────
+    SLA:
+      type: object
+      properties:
+        id:
+          $ref: '#/components/schemas/UUID'
+        team_id:
+          $ref: '#/components/schemas/UUID'
+        incident_id:
+          $ref: '#/components/schemas/UUID'
+        severity:
+          $ref: '#/components/schemas/SeverityLevel'
+        target_minutes:
+          type: integer
+        elapsed_minutes:
+          type: integer
+        is_breached:
+          type: boolean
+        breached_at:
+          $ref: '#/components/schemas/Timestamp'
+        started_at:
+          $ref: '#/components/schemas/Timestamp'
+        paused_at:
+          $ref: '#/components/schemas/Timestamp'
+        created_at:
+          $ref: '#/components/schemas/Timestamp'
+        updated_at:
+          $ref: '#/components/schemas/Timestamp'
+
+    # ──────────────────────────────────────────────
+    # Channels & Messages
+    # ──────────────────────────────────────────────
+    Channel:
+      type: object
+      properties:
+        id:
+          $ref: '#/components/schemas/UUID'
+        incident_id:
+          $ref: '#/components/schemas/UUID'
+        team_id:
+          $ref: '#/components/schemas/UUID'
+        name:
+          type: string
+        channel_type:
+          type: string
+        is_archived:
+          type: boolean
+        created_at:
+          $ref: '#/components/schemas/Timestamp'
+        updated_at:
+          $ref: '#/components/schemas/Timestamp'
+
+    Message:
+      type: object
+      properties:
+        id:
+          $ref: '#/components/schemas/UUID'
+        channel_id:
+          $ref: '#/components/schemas/UUID'
+        user_id:
+          $ref: '#/components/schemas/UUID'
+        content:
+          type: string
+        message_type:
+          type: string
+        is_ai_generated:
+          type: boolean
+        ai_provider:
+          type: string
+        created_at:
+          $ref: '#/components/schemas/Timestamp'
+
+    MessageCreate:
+      type: object
+      required: [content]
+      properties:
+        content:
+          type: string
+        message_type:
+          type: string
+          default: text
+
+    # ──────────────────────────────────────────────
+    # Anomaly Scores
+    # ──────────────────────────────────────────────
+    AnomalyScore:
+      type: object
+      properties:
+        id:
+          $ref: '#/components/schemas/UUID'
+        team_id:
+          $ref: '#/components/schemas/UUID'
+        service:
+          type: string
+        metric_name:
+          type: string
+        score:
+          type: number
+        threshold:
+          type: number
+        is_anomaly:
+          type: boolean
+        detected_at:
+          $ref: '#/components/schemas/Timestamp'
+        incident_id:
+          $ref: '#/components/schemas/UUID'
+        created_at:
+          $ref: '#/components/schemas/Timestamp'
+
+    # ──────────────────────────────────────────────
+    # AI
+    # ──────────────────────────────────────────────
+    AISummaryRequest:
+      type: object
+      required: [incident_id]
+      properties:
+        incident_id:
+          $ref: '#/components/schemas/UUID'
+
+    AISummaryResponse:
+      type: object
+      properties:
+        summary:
+          type: string
+        root_cause_ranking:
+          type: array
+          items:
+            type: object
+            properties:
+              cause:
+                type: string
+              confidence:
+                type: number
+              evidence:
+                type: string
+        provider:
+          type: string
+        generated_at:
+          $ref: '#/components/schemas/Timestamp'
+
+    AIChatRequest:
+      type: object
+      required: [message]
+      properties:
+        message:
+          type: string
+        incident_id:
+          $ref: '#/components/schemas/UUID'
+        context:
+          type: object
+
+    AIChatResponse:
+      type: object
+      properties:
+        response:
+          type: string
+        provider:
+          type: string
+        sources:
+          type: array
+          items:
+            type: object
+
+    # ──────────────────────────────────────────────
+    # Analytics
+    # ──────────────────────────────────────────────
+    IncidentMetrics:
+      type: object
+      properties:
+        total_incidents:
+          type: integer
+        by_severity:
+          type: object
+          properties:
+            SEV1:
+              type: integer
+            SEV2:
+              type: integer
+            SEV3:
+              type: integer
+            SEV4:
+              type: integer
+        by_status:
+          type: object
+        mttr_minutes:
+          type: number
+        sla_breach_rate:
+          type: number
+
+    TimeSeriesPoint:
+      type: object
+      properties:
+        timestamp:
+          $ref: '#/components/schemas/Timestamp'
+        value:
+          type: number
+
+    # ──────────────────────────────────────────────
+    # Integrations
+    # ──────────────────────────────────────────────
+    WebhookPayload:
+      type: object
+      properties:
+        event:
+          type: string
+        payload:
+          type: object
+        source:
+          type: string
+
+security:
+  - bearerAuth: []
+
+paths:
+  # ──────────────────────────────────────────────
+  # Auth
+  # ──────────────────────────────────────────────
+  /auth/register:
+    post:
+      tags: [auth]
+      summary: Register new user and team
+      operationId: register
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/RegisterRequest'
+      responses:
+        '201':
+          description: Registration successful
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/LoginResponse'
+        '400':
+          description: Validation error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  /auth/login:
+    post:
+      tags: [auth]
+      summary: Login and get tokens
+      operationId: login
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/LoginRequest'
+      responses:
+        '200':
+          description: Login successful
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/LoginResponse'
+        '401':
+          description: Invalid credentials
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  /auth/refresh:
+    post:
+      tags: [auth]
+      summary: Refresh access token
+      operationId: refreshToken
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/RefreshRequest'
+      responses:
+        '200':
+          description: Token refreshed
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/LoginResponse'
+        '401':
+          description: Invalid refresh token
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  /auth/me:
+    get:
+      tags: [auth]
+      summary: Get current user profile
+      operationId: getCurrentUser
+      responses:
+        '200':
+          description: User profile
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/User'
+
+  # ──────────────────────────────────────────────
+  # Teams
+  # ──────────────────────────────────────────────
+  /teams:
+    get:
+      tags: [teams]
+      summary: List teams
+      operationId: listTeams
+      responses:
+        '200':
+          description: Teams list
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/Team'
+
+  /teams/{team_id}:
+    get:
+      tags: [teams]
+      summary: Get team details
+      operationId: getTeam
+      parameters:
+        - name: team_id
+          in: path
+          required: true
+          schema:
+            $ref: '#/components/schemas/UUID'
+      responses:
+        '200':
+          description: Team details
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Team'
+
+  # ──────────────────────────────────────────────
+  # Incidents
+  # ──────────────────────────────────────────────
+  /incidents:
+    get:
+      tags: [incidents]
+      summary: List incidents
+      operationId: listIncidents
+      parameters:
+        - name: status
+          in: query
+          schema:
+            $ref: '#/components/schemas/IncidentStatus'
+        - name: severity
+          in: query
+          schema:
+            $ref: '#/components/schemas/SeverityLevel'
+        - name: assigned_to
+          in: query
+          schema:
+            $ref: '#/components/schemas/UUID'
+        - name: page
+          in: query
+          schema:
+            type: integer
+            default: 1
+        - name: per_page
+          in: query
+          schema:
+            type: integer
+            default: 20
+      responses:
+        '200':
+          description: Incidents list
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/Incident'
+                  pagination:
+                    $ref: '#/components/schemas/Pagination'
+
+    post:
+      tags: [incidents]
+      summary: Create incident
+      operationId: createIncident
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/IncidentCreate'
+      responses:
+        '201':
+          description: Incident created
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Incident'
+
+  /incidents/{incident_id}:
+    get:
+      tags: [incidents]
+      summary: Get incident details
+      operationId: getIncident
+      parameters:
+        - name: incident_id
+          in: path
+          required: true
+          schema:
+            $ref: '#/components/schemas/UUID'
+      responses:
+        '200':
+          description: Incident details
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Incident'
+
+    patch:
+      tags: [incidents]
+      summary: Update incident
+      operationId: updateIncident
+      parameters:
+        - name: incident_id
+          in: path
+          required: true
+          schema:
+            $ref: '#/components/schemas/UUID'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/IncidentUpdate'
+      responses:
+        '200':
+          description: Incident updated
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Incident'
+
+  /incidents/{incident_id}/assign:
+    post:
+      tags: [incidents]
+      summary: Assign incident to user
+      operationId: assignIncident
+      parameters:
+        - name: incident_id
+          in: path
+          required: true
+          schema:
+            $ref: '#/components/schemas/UUID'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [user_id]
+              properties:
+                user_id:
+                  $ref: '#/components/schemas/UUID'
+      responses:
+        '200':
+          description: Incident assigned
+
+  /incidents/{incident_id}/escalate:
+    post:
+      tags: [incidents]
+      summary: Escalate incident
+      operationId: escalateIncident
+      parameters:
+        - name: incident_id
+          in: path
+          required: true
+          schema:
+            $ref: '#/components/schemas/UUID'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [user_id]
+              properties:
+                user_id:
+                  $ref: '#/components/schemas/UUID'
+                reason:
+                  type: string
+      responses:
+        '200':
+          description: Incident escalated
+
+  # ──────────────────────────────────────────────
+  # Logs
+  # ──────────────────────────────────────────────
+  /logs:
+    post:
+      tags: [logs]
+      summary: Ingest log entries
+      operationId: ingestLogs
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [entries]
+              properties:
+                entries:
+                  type: array
+                  items:
+                    $ref: '#/components/schemas/LogIngest'
+      responses:
+        '202':
+          description: Logs accepted
+
+  /logs/search:
+    post:
+      tags: [logs]
+      summary: Search logs
+      operationId: searchLogs
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/LogSearchQuery'
+      responses:
+        '200':
+          description: Search results
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/LogEntry'
+                  pagination:
+                    $ref: '#/components/schemas/Pagination'
+
+  # ──────────────────────────────────────────────
+  # Alerts
+  # ──────────────────────────────────────────────
+  /alerts:
+    get:
+      tags: [alerts]
+      summary: List alerts
+      operationId: listAlerts
+      parameters:
+        - name: is_resolved
+          in: query
+          schema:
+            type: boolean
+        - name: severity
+          in: query
+          schema:
+            $ref: '#/components/schemas/SeverityLevel'
+      responses:
+        '200':
+          description: Alerts list
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/Alert'
+
+    post:
+      tags: [alerts]
+      summary: Create alert
+      operationId: createAlert
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/AlertCreate'
+      responses:
+        '201':
+          description: Alert created
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Alert'
+
+  /alerts/{alert_id}/resolve:
+    post:
+      tags: [alerts]
+      summary: Resolve alert
+      operationId: resolveAlert
+      parameters:
+        - name: alert_id
+          in: path
+          required: true
+          schema:
+            $ref: '#/components/schemas/UUID'
+      responses:
+        '200':
+          description: Alert resolved
+
+  # ──────────────────────────────────────────────
+  # Service Health
+  # ──────────────────────────────────────────────
+  /health/services:
+    get:
+      tags: [health]
+      summary: List service health statuses
+      operationId: listServiceHealth
+      responses:
+        '200':
+          description: Service health list
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/ServiceHealth'
+
+  /health/services/{service_name}:
+    get:
+      tags: [health]
+      summary: Get service health
+      operationId: getServiceHealth
+      parameters:
+        - name: service_name
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Service health
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ServiceHealth'
+
+    put:
+      tags: [health]
+      summary: Update service health
+      operationId: updateServiceHealth
+      parameters:
+        - name: service_name
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ServiceHealthUpdate'
+      responses:
+        '200':
+          description: Health updated
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ServiceHealth'
+
+  # ──────────────────────────────────────────────
+  # Deployments
+  # ──────────────────────────────────────────────
+  /deployments:
+    get:
+      tags: [deployments]
+      summary: List deployments
+      operationId: listDeployments
+      parameters:
+        - name: service
+          in: query
+          schema:
+            type: string
+        - name: status
+          in: query
+          schema:
+            $ref: '#/components/schemas/DeployStatus'
+        - name: environment
+          in: query
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Deployments list
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/Deployment'
+
+    post:
+      tags: [deployments]
+      summary: Create deployment
+      operationId: createDeployment
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/DeploymentCreate'
+      responses:
+        '201':
+          description: Deployment created
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Deployment'
+
+  /deployments/{deployment_id}:
+    get:
+      tags: [deployments]
+      summary: Get deployment
+      operationId: getDeployment
+      parameters:
+        - name: deployment_id
+          in: path
+          required: true
+          schema:
+            $ref: '#/components/schemas/UUID'
+      responses:
+        '200':
+          description: Deployment details
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Deployment'
+
+  /deployments/{deployment_id}/rollback:
+    post:
+      tags: [deployments]
+      summary: Rollback deployment
+      operationId: rollbackDeployment
+      parameters:
+        - name: deployment_id
+          in: path
+          required: true
+          schema:
+            $ref: '#/components/schemas/UUID'
+      responses:
+        '200':
+          description: Rollback initiated
+
+  # ──────────────────────────────────────────────
+  # Commits
+  # ──────────────────────────────────────────────
+  /commits:
+    get:
+      tags: [commits]
+      summary: List commits
+      operationId: listCommits
+      parameters:
+        - name: repository
+          in: query
+          schema:
+            type: string
+        - name: branch
+          in: query
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Commits list
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/Commit'
+
+  # ──────────────────────────────────────────────
+  # Timeline
+  # ──────────────────────────────────────────────
+  /incidents/{incident_id}/timeline:
+    get:
+      tags: [timeline]
+      summary: Get incident timeline
+      operationId: getIncidentTimeline
+      parameters:
+        - name: incident_id
+          in: path
+          required: true
+          schema:
+            $ref: '#/components/schemas/UUID'
+      responses:
+        '200':
+          description: Timeline events
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/TimelineEvent'
+
+    post:
+      tags: [timeline]
+      summary: Add timeline event
+      operationId: addTimelineEvent
+      parameters:
+        - name: incident_id
+          in: path
+          required: true
+          schema:
+            $ref: '#/components/schemas/UUID'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/TimelineEventCreate'
+      responses:
+        '201':
+          description: Event added
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/TimelineEvent'
+
+  # ──────────────────────────────────────────────
+  # Tasks
+  # ──────────────────────────────────────────────
+  /tasks:
+    get:
+      tags: [tasks]
+      summary: List tasks
+      operationId: listTasks
+      parameters:
+        - name: incident_id
+          in: query
+          schema:
+            $ref: '#/components/schemas/UUID'
+        - name: assigned_to
+          in: query
+          schema:
+            $ref: '#/components/schemas/UUID'
+        - name: status
+          in: query
+          schema:
+            $ref: '#/components/schemas/TaskStatus'
+      responses:
+        '200':
+          description: Tasks list
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/Task'
+
+    post:
+      tags: [tasks]
+      summary: Create task
+      operationId: createTask
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/TaskCreate'
+      responses:
+        '201':
+          description: Task created
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Task'
+
+  /tasks/{task_id}:
+    get:
+      tags: [tasks]
+      summary: Get task
+      operationId: getTask
+      parameters:
+        - name: task_id
+          in: path
+          required: true
+          schema:
+            $ref: '#/components/schemas/UUID'
+      responses:
+        '200':
+          description: Task details
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Task'
+
+    patch:
+      tags: [tasks]
+      summary: Update task
+      operationId: updateTask
+      parameters:
+        - name: task_id
+          in: path
+          required: true
+          schema:
+            $ref: '#/components/schemas/UUID'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/TaskUpdate'
+      responses:
+        '200':
+          description: Task updated
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Task'
+
+  # ──────────────────────────────────────────────
+  # SLA
+  # ──────────────────────────────────────────────
+  /slas:
+    get:
+      tags: [sla]
+      summary: List SLAs
+      operationId: listSLAs
+      parameters:
+        - name: incident_id
+          in: query
+          schema:
+            $ref: '#/components/schemas/UUID'
+        - name: is_breached
+          in: query
+          schema:
+            type: boolean
+      responses:
+        '200':
+          description: SLAs list
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/SLA'
+
+  /slas/{sla_id}:
+    get:
+      tags: [sla]
+      summary: Get SLA
+      operationId: getSLA
+      parameters:
+        - name: sla_id
+          in: path
+          required: true
+          schema:
+            $ref: '#/components/schemas/UUID'
+      responses:
+        '200':
+          description: SLA details
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SLA'
+
+  # ──────────────────────────────────────────────
+  # Channels & Messages
+  # ──────────────────────────────────────────────
+  /incidents/{incident_id}/channels:
+    get:
+      tags: [channels]
+      summary: List incident channels
+      operationId: listIncidentChannels
+      parameters:
+        - name: incident_id
+          in: path
+          required: true
+          schema:
+            $ref: '#/components/schemas/UUID'
+      responses:
+        '200':
+          description: Channels list
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/Channel'
+
+  /channels/{channel_id}/messages:
+    get:
+      tags: [messages]
+      summary: List channel messages
+      operationId: listChannelMessages
+      parameters:
+        - name: channel_id
+          in: path
+          required: true
+          schema:
+            $ref: '#/components/schemas/UUID'
+        - name: page
+          in: query
+          schema:
+            type: integer
+        - name: per_page
+          in: query
+          schema:
+            type: integer
+      responses:
+        '200':
+          description: Messages list
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/Message'
+                  pagination:
+                    $ref: '#/components/schemas/Pagination'
+
+    post:
+      tags: [messages]
+      summary: Send message
+      operationId: sendMessage
+      parameters:
+        - name: channel_id
+          in: path
+          required: true
+          schema:
+            $ref: '#/components/schemas/UUID'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/MessageCreate'
+      responses:
+        '201':
+          description: Message sent
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Message'
+
+  # ──────────────────────────────────────────────
+  # AI
+  # ──────────────────────────────────────────────
+  /ai/summarize:
+    post:
+      tags: [ai]
+      summary: Generate incident summary
+      operationId: aiSummarize
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/AISummaryRequest'
+      responses:
+        '200':
+          description: AI summary
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AISummaryResponse'
+
+  /ai/root-cause:
+    post:
+      tags: [ai]
+      summary: Analyze root cause
+      operationId: aiRootCause
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/AISummaryRequest'
+      responses:
+        '200':
+          description: Root cause analysis
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AISummaryResponse'
+
+  /ai/chat:
+    post:
+      tags: [ai]
+      summary: AI chat assistant
+      operationId: aiChat
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/AIChatRequest'
+      responses:
+        '200':
+          description: AI response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AIChatResponse'
+
+  /ai/postmortem:
+    post:
+      tags: [ai]
+      summary: Generate postmortem
+      operationId: aiPostmortem
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [incident_id]
+              properties:
+                incident_id:
+                  $ref: '#/components/schemas/UUID'
+      responses:
+        '200':
+          description: Postmortem document
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  postmortem:
+                    type: string
+                  provider:
+                    type: string
+
+  # ──────────────────────────────────────────────
+  # Analytics
+  # ──────────────────────────────────────────────
+  /analytics/incidents:
+    get:
+      tags: [analytics]
+      summary: Get incident metrics
+      operationId: getIncidentMetrics
+      parameters:
+        - name: start_time
+          in: query
+          schema:
+            $ref: '#/components/schemas/Timestamp'
+        - name: end_time
+          in: query
+          schema:
+            $ref: '#/components/schemas/Timestamp'
+      responses:
+        '200':
+          description: Incident metrics
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/IncidentMetrics'
+
+  /analytics/incidents/timeseries:
+    get:
+      tags: [analytics]
+      summary: Get incident time series
+      operationId: getIncidentTimeSeries
+      parameters:
+        - name: start_time
+          in: query
+          schema:
+            $ref: '#/components/schemas/Timestamp'
+        - name: end_time
+          in: query
+          schema:
+            $ref: '#/components/schemas/Timestamp'
+        - name: interval
+          in: query
+          schema:
+            type: string
+            enum: [hour, day, week, month]
+      responses:
+        '200':
+          description: Time series data
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/TimeSeriesPoint'
+
+  /analytics/services:
+    get:
+      tags: [analytics]
+      summary: Get service analytics
+      operationId: getServiceAnalytics
+      responses:
+        '200':
+          description: Service analytics
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  services:
+                    type: array
+                    items:
+                      type: object
+                      properties:
+                        name:
+                          type: string
+                        uptime:
+                          type: number
+                        incident_count:
+                          type: integer
+                        avg_resolution_time:
+                          type: number
+
+  # ──────────────────────────────────────────────
+  # Integrations
+  # ──────────────────────────────────────────────
+  /integrations/github/webhook:
+    post:
+      tags: [integrations]
+      summary: GitHub webhook receiver
+      operationId: githubWebhook
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/WebhookPayload'
+      responses:
+        '200':
+          description: Webhook processed
+
+  /integrations/gitlab/webhook:
+    post:
+      tags: [integrations]
+      summary: GitLab webhook receiver
+      operationId: gitlabWebhook
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/WebhookPayload'
+      responses:
+        '200':
+          description: Webhook processed
+
+  # ──────────────────────────────────────────────
+  # Realtime (SSE)
+  # ──────────────────────────────────────────────
+  /realtime/events:
+    get:
+      tags: [realtime]
+      summary: SSE event stream
+      operationId: realtimeEvents
+      description: |
+        Server-Sent Events stream for real-time updates.
+        Subscribe to incident updates, alerts, and system events.
+      parameters:
+        - name: incident_id
+          in: query
+          schema:
+            $ref: '#/components/schemas/UUID'
+        - name: events
+          in: query
+          description: Comma-separated event types
+          schema:
+            type: string
+      responses:
+        '200':
+          description: SSE stream
+          content:
+            text/event-stream:
+              schema:
+                type: string
+
+  # ──────────────────────────────────────────────
+  # Metrics (Prometheus)
+  # ──────────────────────────────────────────────
+  /metrics:
+    get:
+      tags: [metrics]
+      summary: Prometheus metrics
+      operationId: getMetrics
+      security: []
+      responses:
+        '200':
+          description: Prometheus metrics
+          content:
+            text/plain:
+              schema:
+                type: string
