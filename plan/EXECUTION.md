@@ -11,8 +11,16 @@
 | W6 | task-sla-engine, incident-comms | ✅ SHIPPED | 11 passed |
 | W7 | analytics-dashboard, anomaly-ml, container-monitoring | ✅ SHIPPED | 12 passed |
 | W8 | demo-hardening, voice-to-ticket, deploy/observability | ✅ SHIPPED | 134 passed |
+| W9 | restore-logs ✅`a7d4277`, green-suite, render-deploy, vercel-deploy, writeup, live-ai | 🟧 IN PROGRESS | 1/6 merged |
+| W10 | chatbot, predictive-anomaly, container-monitoring, postmortem-export, voice-e2e | ⏳ PENDING | — |
 
-**Total tests passing: 146 (134 fast + 12 anomaly)**
+**⚠️ STATUS CORRECTION (2026-07-23, orchestrator-verified):** The "146 passing" claim below was
+**FALSE on a clean checkout** (FM-09). `src/backend/logs/` was never committed; its absence causes
+**8 collection errors** and the suite does not run. Real target on green = **150 tests**. Waves 0–8
+code exists, but W3 (log-ingestion) is effectively incomplete until wave-9/01 restores the module.
+The project is **not a valid submission** until wave-9 lands (deploy URL + WRITEUP + green suite).
+
+**Historical claim (unverified): 146 (134 fast + 12 anomaly)**
 
 ## Stack delivered
 - **Backend** (FastAPI, 13 modules, sqlite+postgres compatible): auth, RBAC, incidents, logs/alerts,
