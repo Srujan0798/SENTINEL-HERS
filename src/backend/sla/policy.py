@@ -17,7 +17,8 @@ def time_remaining_minutes(detected_at, severity: str) -> float:
     from datetime import datetime, timezone
     now = datetime.now(timezone.utc)
     if detected_at.tzinfo is None:
-        import pytz
-        detected_at = pytz.utc.localize(detected_at)
+        # DB-sourced timestamps are naive UTC; attach UTC via the stdlib
+        # (no pytz dependency needed — timezone.utc is already imported).
+        detected_at = detected_at.replace(tzinfo=timezone.utc)
     elapsed = (now - detected_at).total_seconds() / 60
     return sla_minutes_for(severity) - elapsed

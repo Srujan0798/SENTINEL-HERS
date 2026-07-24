@@ -15,7 +15,9 @@ def list_pods() -> list[dict[str, Any]]:
             config.load_incluster_config()
 
         v1 = client.CoreV1Api()
-        pods = v1.list_pod_for_all_namespaces(watch=False)
+        # Bound the call: an unreachable cluster must fail fast and fall through
+        # to the graceful [] below (FM-11) rather than block the request forever.
+        pods = v1.list_pod_for_all_namespaces(watch=False, _request_timeout=3)
         result = []
         for pod in pods.items:
             conditions = {c.type: c.status for c in (pod.status.conditions or [])}
