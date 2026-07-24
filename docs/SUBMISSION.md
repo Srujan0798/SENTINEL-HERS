@@ -48,8 +48,7 @@ containers), analytics, deployments. Realtime SSE status indicator.
 health-checked), Prometheus alert rules, Grafana dashboard auto-provisioned, one-command
 seed script for the demo path.
 
-Status: **183/183 tests green; frontend builds clean.** Remaining work is polish:
-production deploy, demo video, and a few UX refinements.
+Status: **185+ tests green; live FE+API; demo seeded (SEV1+MTTR).** Optional: demo Loom video.
 
 ---
 
