@@ -59,10 +59,21 @@ def _get_or_create_user(db: Session, team: TeamModel) -> UserModel:
 @router.post("/seed", status_code=201)
 async def seed_demo(
     x_seed_secret: str = Header(None),
+    x_ai_provider: str | None = Header(None),
+    x_openrouter_key: str | None = Header(None),
+    x_nvapi_key: str | None = Header(None),
     db: Session = Depends(get_db),
 ):
     if not x_seed_secret or x_seed_secret != SEED_SECRET:
         raise HTTPException(status_code=403, detail="Invalid seed secret")
+
+    if x_ai_provider:
+        os.environ["AI_PROVIDER"] = x_ai_provider
+    if x_openrouter_key:
+        os.environ["OPENROUTER_API_KEY"] = x_openrouter_key
+    if x_nvapi_key:
+        os.environ["NVAPI_KEY"] = x_nvapi_key
+
     try:
         team = _get_or_create_team(db, "Acme SRE")
         user = _get_or_create_user(db, team)
