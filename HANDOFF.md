@@ -7,20 +7,17 @@
 | Item | Status |
 |------|--------|
 | Full suite | ✅ **183 passed**, 0 failed |
-| Wave-10 features (chat, anomaly, containers, postmortem, voice, CI) | ✅ code landed + greened |
-| WRITEUP / walkthrough / deploy configs | ✅ offline done |
-| Live Render + Vercel URLs | 🟧 **URL agents / human** |
-| `git push` | 🟧 human (main ahead of origin) |
+| Vercel production | ✅ `https://sentinel-hers.vercel.app` live |
+| Render backend | ✅ `https://sentinel-api-clu9.onrender.com` live |
+| Demo login | ✅ `demo@sentinel.io` / `Sentinel2026!` — 3 incidents seeded |
+| README + SUBMISSION.md | ✅ URLs + test count updated |
+| All commits pushed | ✅ `origin/main` up to date |
 
-## Your only remaining path to submit
-1. `git push origin main`
-2. Render Blueprint + Vercel (Root=`src/frontend`)
-3. Paste live URLs into README (Agent F / URL agents)
-4. Submit: GitHub + live URL + WRITEUP
-
-## Demo
-`demo@sentinel.io` / `Sentinel2026!`  
-Path: login → SEV1 → AI → assign/SLA → timeline → analytics → chat → postmortem
+## Demo path (works!)
+1. Go to `https://sentinel-hers.vercel.app/login`
+2. Login with `demo@sentinel.io` / `Sentinel2026!`
+3. See 3 incidents (SEV1, SEV2, SEV3)
+4. AI summary, timeline, analytics, chat, postmortem
 
 ## Resume
-This file → `plan/EXECUTION.md` → live URLs only.
+Submit: GitHub + live URL + WRITEUP.md
