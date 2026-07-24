@@ -15,7 +15,10 @@ export function StatusBar({ teamId }: StatusBarProps) {
   useEffect(() => {
     if (!teamId) return;
 
-    const base = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
+    const base =
+      process.env.NEXT_PUBLIC_API_BASE_URL ||
+      process.env.NEXT_PUBLIC_API_URL ||
+      "http://localhost:8000";
     const token = typeof window !== "undefined" ? localStorage.getItem("sentinel_token") : null;
     if (!token) return;
 

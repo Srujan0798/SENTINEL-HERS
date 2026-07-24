@@ -1,6 +1,10 @@
 "use client";
 
-const BASE = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
+// Prefer NEXT_PUBLIC_API_BASE_URL (prod); fall back to legacy names for local dev.
+const BASE =
+  process.env.NEXT_PUBLIC_API_BASE_URL ||
+  process.env.NEXT_PUBLIC_API_URL ||
+  "http://localhost:8000";
 
 function getToken(): string | null {
   if (typeof window === "undefined") return null;

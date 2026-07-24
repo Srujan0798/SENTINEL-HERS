@@ -3,7 +3,13 @@
 import { useEffect, useRef, useCallback } from "react";
 import { getAccessToken } from "./auth";
 
-const API_BASE = process.env.NEXT_PUBLIC_API_BASE || "http://localhost:8000/api/v1";
+// Origin only (no path). Prefer NEXT_PUBLIC_API_BASE_URL; fall back to legacy names.
+const API_ORIGIN = (
+  process.env.NEXT_PUBLIC_API_BASE_URL ||
+  process.env.NEXT_PUBLIC_API_URL ||
+  process.env.NEXT_PUBLIC_API_BASE ||
+  "http://localhost:8000"
+).replace(/\/api\/v1\/?$/, "");
 
 export interface RealtimeEvent {
   event_type: string;
@@ -53,7 +59,10 @@ export function useRealtimeStream(
 
     cleanup();
 
-    const url = `${API_BASE.replace("/api/v1", "")}/api/v1/realtime/events?token=${encodeURIComponent(token)}`;
+    const wsBase = process.env.NEXT_PUBLIC_WS_URL;
+    const url = wsBase
+      ? `${wsBase.replace(/\/$/, "")}/api/v1/realtime/events?token=${encodeURIComponent(token)}`
+      : `${API_ORIGIN}/api/v1/realtime/events?token=${encodeURIComponent(token)}`;
     const es = new EventSource(url);
     eventSourceRef.current = es;
 
