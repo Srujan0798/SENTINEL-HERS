@@ -19,6 +19,9 @@ router = APIRouter(prefix="/api/voice", tags=["voice"])
 
 ALLOWED_EXTENSIONS = {".wav", ".mp3", ".webm", ".m4a", ".ogg", ".flac"}
 
+# Maximum audio file size: 60 MB
+MAX_AUDIO_SIZE = 60 * 1024 * 1024
+
 
 @router.post("/incidents", status_code=status.HTTP_201_CREATED)
 async def voice_to_incident(
@@ -43,40 +46,84 @@ async def voice_to_incident(
             detail="Empty audio file",
         )
 
-    # Step 1: Transcribe
+    # Validate audio content
     transcriber = get_transcriber()
     try:
+        transcriber.validate_audio(audio_bytes, file.filename or "")
+    except ValueError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=f"Invalid audio data: {exc}",
+        ) from exc
+
+    if len(audio_bytes) > MAX_AUDIO_SIZE:
+        raise HTTPException(
+            status_code=status.HTTP_413_CONTENT_TOO_LARGE,
+            detail=f"Audio file too large ({len(audio_bytes)} bytes). Maximum: {MAX_AUDIO_SIZE}",
+        )
+
+    # Step 1: Transcribe
+    try:
         transcript = transcriber.transcribe(audio_bytes, filename=file.filename or "audio.wav")
+    except ValueError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=f"Transcription rejected: {exc}",
+        ) from exc
     except Exception as exc:
         raise HTTPException(
             status_code=status.HTTP_502_BAD_GATEWAY,
-            detail=f"Transcription failed: {exc}",
-        )
+            detail=f"Transcription failed unexpectedly: {exc}",
+        ) from exc
+
+    if not transcript or not transcript.strip():
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail="Transcription returned empty text — could not extract incident details",
+        ) from None
 
     # Step 2: Parse via LLM
     try:
         parsed = parse_voice_to_incident(transcript)
+    except ValueError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail=f"Could not parse transcript into incident: {exc}",
+        ) from exc
     except Exception as exc:
         raise HTTPException(
             status_code=status.HTTP_502_BAD_GATEWAY,
-            detail=f"Parsing failed: {exc}",
-        )
+            detail=f"Parsing failed unexpectedly: {exc}",
+        ) from exc
 
     # Step 3: Create incident
-    severity = SeverityLevel(parsed.severity)
+    try:
+        severity = SeverityLevel(parsed.severity)
+    except ValueError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Invalid severity from parse: {parsed.severity}",
+        ) from exc
+
     svc = IncidentService(db)
-    result = svc.create_incident(
-        team_id=team_id,
-        title=parsed.title,
-        severity=severity,
-        description=parsed.description,
-        metadata={
-            "source": "voice",
-            "transcript": transcript,
-            "affected_services": parsed.affected_services,
-        },
-        actor=actor,
-    )
+    try:
+        result = svc.create_incident(
+            team_id=team_id,
+            title=parsed.title,
+            severity=severity,
+            description=parsed.description,
+            metadata={
+                "source": "voice",
+                "transcript": transcript,
+                "affected_services": parsed.affected_services,
+            },
+            actor=actor,
+        )
+    except Exception as exc:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Failed to create incident: {exc}",
+        ) from exc
 
     return result
 

@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { api, type Incident } from "@/lib/api";
 import { ChatPanel } from "@/components/chat/ChatPanel";
 
@@ -28,6 +29,9 @@ export default function IncidentsPage() {
   const [aiSummary, setAiSummary] = useState<string | null>(null);
   const [aiLoading, setAiLoading] = useState(false);
   const [loading, setLoading] = useState(true);
+  const [postmortem, setPostmortem] = useState<string | null>(null);
+  const [postmortemLoading, setPostmortemLoading] = useState(false);
+  const [postmortemOpen, setPostmortemOpen] = useState(false);
 
   useEffect(() => {
     api.get<Incident[]>("/api/incidents")
@@ -46,6 +50,42 @@ export default function IncidentsPage() {
       setAiSummary("AI summary unavailable.");
     } finally {
       setAiLoading(false);
+    }
+  }
+
+  async function generatePostmortem() {
+    if (!selected) return;
+    setPostmortemLoading(true);
+    setPostmortem(null);
+    setPostmortemOpen(true);
+    try {
+      const res = await api.get<{ content: string }>(`/api/ai/postmortem/${selected.id}`);
+      setPostmortem(res.content);
+    } catch {
+      setPostmortem("Postmortem generation failed. Ensure the incident has timeline data.");
+    } finally {
+      setPostmortemLoading(false);
+    }
+  }
+
+  async function downloadPostmortem() {
+    if (!selected) return;
+    try {
+      const token = localStorage.getItem("sentinel_token");
+      const base = process.env.NEXT_PUBLIC_API_BASE_URL || process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
+      const res = await fetch(`${base}/api/ai/postmortem/${selected.id}?format=md`, {
+        headers: token ? { Authorization: `Bearer ${token}` } : {},
+      });
+      if (!res.ok) throw new Error("Download failed");
+      const blob = await res.blob();
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = `postmortem-${selected.id.slice(0, 8)}.md`;
+      a.click();
+      URL.revokeObjectURL(url);
+    } catch {
+      setPostmortem("Download failed.");
     }
   }
 
@@ -145,6 +185,35 @@ export default function IncidentsPage() {
                   >
                     Root Cause Analysis
                   </Button>
+                  <Dialog open={postmortemOpen} onOpenChange={setPostmortemOpen}>
+                    <DialogTrigger asChild>
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        className="w-full"
+                        onClick={generatePostmortem}
+                      >
+                        Generate Postmortem
+                      </Button>
+                    </DialogTrigger>
+                    <DialogContent className="max-w-2xl max-h-[80vh] overflow-y-auto">
+                      <DialogHeader>
+                        <DialogTitle>Postmortem — {selected?.title}</DialogTitle>
+                      </DialogHeader>
+                      {postmortemLoading ? (
+                        <p className="text-sm text-muted-foreground animate-pulse">Generating postmortem…</p>
+                      ) : (
+                        <div className="space-y-3">
+                          <div className="prose prose-sm max-w-none whitespace-pre-wrap text-sm">
+                            {postmortem}
+                          </div>
+                          <Button variant="default" size="sm" onClick={downloadPostmortem}>
+                            Download Markdown
+                          </Button>
+                        </div>
+                      )}
+                    </DialogContent>
+                  </Dialog>
                 </div>
               </CardContent>
             </Card>

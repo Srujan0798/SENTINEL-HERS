@@ -11,6 +11,26 @@ class Transcriber(ABC):
     def transcribe(self, audio_bytes: bytes, filename: str = "") -> str:
         """Transcribe audio bytes to text."""
 
+    def validate_audio(self, audio_bytes: bytes, filename: str = "") -> None:
+        """Validate audio bytes are non-empty and appear to be audio data."""
+        if len(audio_bytes) == 0:
+            raise ValueError("Audio bytes are empty")
+        if len(audio_bytes) < 44:
+            raise ValueError(
+                f"Audio data too short ({len(audio_bytes)} bytes) for a valid WAV file"
+            )
+        if not audio_bytes.startswith(b"RIFF"):
+            if not filename or not any(
+                filename.lower().endswith(ext) for ext in (".wav", ".mp3", ".webm", ".m4a", ".ogg", ".flac")
+            ):
+                pass
+            riff_magic = audio_bytes[:4]
+            if riff_magic not in (b"RIFF", b"OggS", b"fLaC") and not audio_bytes[:3] == b"ID3":
+                raise ValueError(
+                    "Audio data does not start with a recognized audio format signature "
+                    "(expected RIFF/WAV, Ogg, FLAC, or MP3 ID3 header)"
+                )
+
 
 class OpenAITranscriber(Transcriber):
     def __init__(self):
@@ -19,13 +39,17 @@ class OpenAITranscriber(Transcriber):
         self._model = os.getenv("WHISPER_MODEL", "whisper-1")
 
     def transcribe(self, audio_bytes: bytes, filename: str = "audio.wav") -> str:
+        self.validate_audio(audio_bytes, filename)
         audio_file = io.BytesIO(audio_bytes)
         audio_file.name = filename
         response = self._client.audio.transcriptions.create(
             model=self._model,
             file=audio_file,
         )
-        return response.text
+        text = response.text.strip()
+        if not text:
+            raise ValueError("Transcription returned empty text — audio may be silent or corrupted")
+        return text
 
 
 class MockTranscriber(Transcriber):
@@ -34,6 +58,7 @@ class MockTranscriber(Transcriber):
     MOCK_TEXT = "database is on fire, all write requests failing with timeout errors on the payments service"
 
     def transcribe(self, audio_bytes: bytes, filename: str = "") -> str:
+        self.validate_audio(audio_bytes, filename)
         return self.MOCK_TEXT
 
 

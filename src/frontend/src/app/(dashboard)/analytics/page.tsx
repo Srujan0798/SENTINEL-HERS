@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { api, type AnalyticsSummary } from "@/lib/api";
+import { api, type AnalyticsSummary, type AnomalySeriesData } from "@/lib/api";
 
 interface TopError {
   message: string;
@@ -17,10 +17,17 @@ interface AlertTrend {
   resolution_rate: number;
 }
 
+const riskColor: Record<string, string> = {
+  low: "bg-green-100 text-green-800 border-green-300",
+  medium: "bg-yellow-100 text-yellow-800 border-yellow-300",
+  high: "bg-red-100 text-red-800 border-red-300",
+};
+
 export default function AnalyticsPage() {
   const [summary, setSummary] = useState<AnalyticsSummary | null>(null);
   const [topErrors, setTopErrors] = useState<TopError[]>([]);
   const [trend, setTrend] = useState<AlertTrend | null>(null);
+  const [anomaly, setAnomaly] = useState<AnomalySeriesData | null>(null);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
@@ -28,10 +35,12 @@ export default function AnalyticsPage() {
       api.get<AnalyticsSummary>("/api/analytics/incidents/summary"),
       api.get<TopError[]>("/api/analytics/logs/top-errors"),
       api.get<AlertTrend>("/api/analytics/alerts/trend"),
-    ]).then(([s, e, t]) => {
+      api.get<AnomalySeriesData>("/api/analytics/anomalies"),
+    ]).then(([s, e, t, a]) => {
       if (s.status === "fulfilled") setSummary(s.value);
       if (e.status === "fulfilled") setTopErrors(e.value);
       if (t.status === "fulfilled") setTrend(t.value);
+      if (a.status === "fulfilled") setAnomaly(a.value);
       setLoading(false);
     });
   }, []);
@@ -139,6 +148,62 @@ export default function AnalyticsPage() {
           </CardContent>
         </Card>
       </div>
+
+      {/* Anomaly Trend + Risk Badge */}
+      <Card>
+        <CardHeader>
+          <div className="flex items-center justify-between">
+            <CardTitle>Predictive Anomaly Risk</CardTitle>
+            {anomaly && (
+              <span className={`px-3 py-1 rounded-full text-sm font-semibold border ${riskColor[anomaly.risk_level] || riskColor.low}`}>
+                {anomaly.risk_level.toUpperCase()} RISK
+              </span>
+            )}
+          </div>
+        </CardHeader>
+        <CardContent>
+          {!anomaly ? (
+            <p className="text-muted-foreground text-sm">No anomaly data yet.</p>
+          ) : (
+            <div className="space-y-4">
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
+                {anomaly.series.map((entry) => (
+                  <div
+                    key={entry.service}
+                    className={`rounded border px-3 py-2 ${entry.is_anomaly ? "border-red-300 bg-red-50" : "border-green-200 bg-green-50"}`}
+                  >
+                    <p className="text-xs text-muted-foreground truncate">{entry.service}</p>
+                    <div className="flex items-center gap-2 mt-1">
+                      <div className="flex-1 h-2 bg-gray-200 rounded">
+                        <div
+                          className={`h-2 rounded ${entry.is_anomaly ? "bg-red-500" : "bg-green-500"}`}
+                          style={{ width: `${Math.min(Math.abs(entry.score) * 100, 100)}%` }}
+                        />
+                      </div>
+                      <span className="text-xs font-mono font-bold shrink-0">
+                        {entry.score.toFixed(3)}
+                      </span>
+                    </div>
+                    <p className="text-xs mt-1">
+                      {entry.is_anomaly ? (
+                        <span className="text-red-600 font-semibold">ANOMALOUS</span>
+                      ) : (
+                        <span className="text-green-700 font-semibold">normal</span>
+                      )}
+                      <span className="text-muted-foreground ml-2">
+                        threshold={entry.threshold.toFixed(3)}
+                      </span>
+                    </p>
+                  </div>
+                ))}
+              </div>
+              <div className="text-sm text-muted-foreground">
+                Anomaly-generated alerts: <span className="font-bold">{anomaly.anomaly_alerts_count}</span>
+              </div>
+            </div>
+          )}
+        </CardContent>
+      </Card>
 
       {/* Status Breakdown */}
       {summary?.by_status && (

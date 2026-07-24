@@ -45,6 +45,7 @@ def setup_db():
     app.dependency_overrides[get_db] = override_db
     Base.metadata.create_all(bind=engine)
     yield
+    app.dependency_overrides.clear()
     Base.metadata.drop_all(bind=engine)
     Path("test_anomaly.db").unlink(missing_ok=True)
     Path("/tmp/test_anomaly_model.joblib").unlink(missing_ok=True)
@@ -122,6 +123,45 @@ class TestAnomalyAPI:
         resp = client.post("/api/ml/score", json={"service": "svc", "metrics": [0.5]})
         assert resp.status_code in (401, 403)
 
+    def test_anomaly_score_creates_alert(self, auth):
+        from src.backend.logs.models import AlertModel
+        resp = client.post(
+            "/api/ml/score",
+            json={"service": "db-worker", "metrics": [0.99]},
+            headers=auth["headers"],
+        )
+        assert resp.status_code == 200
+        assert resp.json()["is_anomaly"] is True
+        db = TestingSession()
+        try:
+            alerts = db.query(AlertModel).filter(
+                AlertModel.source == "anomaly-ml",
+                AlertModel.alert_type == "ModelAnomaly",
+            ).all()
+            assert len(alerts) >= 1
+            for a in alerts:
+                assert a.severity == "SEV4"
+                assert a.source == "anomaly-ml"
+        finally:
+            db.close()
+
+    def test_normal_score_no_alert(self, auth):
+        from src.backend.logs.models import AlertModel
+        before = TestingSession().query(AlertModel).filter(
+            AlertModel.source == "anomaly-ml",
+        ).count()
+        resp = client.post(
+            "/api/ml/score",
+            json={"service": "api-gateway", "metrics": [0.4]},
+            headers=auth["headers"],
+        )
+        assert resp.status_code == 200
+        assert resp.json()["is_anomaly"] is False
+        after = TestingSession().query(AlertModel).filter(
+            AlertModel.source == "anomaly-ml",
+        ).count()
+        assert after == before
+
 
 class TestAnalyticsEndpoints:
     def test_incident_summary(self, auth):
@@ -150,6 +190,45 @@ class TestAnalyticsEndpoints:
         data = resp.json()
         assert "docker" in data
         assert "kubernetes" in data
-        assert isinstance(data["docker"], list)
-        # k8s returns [] gracefully without kubeconfig
-        assert isinstance(data["kubernetes"], list)
+        assert isinstance(data["docker"], dict)
+        assert "available" in data["docker"]
+        assert "containers" in data["docker"]
+        assert isinstance(data["kubernetes"], dict)
+        assert "available" in data["kubernetes"]
+
+
+class TestAnomalyAnalytics:
+    def test_analytics_anomalies_endpoint(self, auth):
+        resp = client.get("/api/analytics/anomalies", headers=auth["headers"])
+        assert resp.status_code == 200
+        data = resp.json()
+        assert "series" in data
+        assert "risk_level" in data
+        assert "anomaly_alerts_count" in data
+        assert isinstance(data["series"], list)
+        assert data["risk_level"] in ("low", "medium", "high")
+        for entry in data["series"]:
+            assert "service" in entry
+            assert "score" in entry
+            assert "is_anomaly" in entry
+            assert "threshold" in entry
+            assert isinstance(entry["score"], float)
+            assert isinstance(entry["is_anomaly"], bool)
+
+    def test_anomaly_analytics_alert_count_reflects_raises(self, auth):
+        """Score known-anomalous data, then verify analytics endpoint reflects it."""
+        resp = client.post(
+            "/api/ml/score",
+            json={"service": "db-worker", "metrics": [0.99]},
+            headers=auth["headers"],
+        )
+        assert resp.status_code == 200
+        assert resp.json()["is_anomaly"] is True
+
+        resp2 = client.get("/api/analytics/anomalies", headers=auth["headers"])
+        assert resp2.status_code == 200
+        data = resp2.json()
+        assert isinstance(data["series"], list)
+        assert len(data["series"]) > 0
+        assert data["risk_level"] in ("low", "medium", "high")
+        assert data["anomaly_alerts_count"] >= 1

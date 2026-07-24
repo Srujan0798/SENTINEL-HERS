@@ -4,12 +4,29 @@ from typing import Any
 
 logger = logging.getLogger(__name__)
 
+try:
+    import docker as _docker
+    _DOCKER_AVAILABLE = True
+except ImportError:
+    _docker = None
+    _DOCKER_AVAILABLE = False
 
-def list_containers() -> list[dict[str, Any]]:
-    """Return running containers. Returns [] if Docker daemon is unreachable."""
+
+def list_containers() -> dict[str, Any]:
+    """Return running containers with availability info.
+
+    On success: {"available": True, "containers": [...]}
+    On failure: {"available": False, "reason": "<error>", "containers": []}
+    Never crashes — FM-11 fail loud via logging, graceful surface to caller.
+    """
+    if not _DOCKER_AVAILABLE:
+        return {
+            "available": False,
+            "reason": "docker Python package not installed",
+            "containers": [],
+        }
     try:
-        import docker
-        client = docker.from_env()
+        client = _docker.from_env()
         containers = client.containers.list()
         result = []
         for c in containers:
@@ -35,7 +52,11 @@ def list_containers() -> list[dict[str, Any]]:
                 "started_at": c.attrs.get("State", {}).get("StartedAt", ""),
                 "source": "docker",
             })
-        return result
+        return {"available": True, "reason": None, "containers": result}
     except Exception as exc:
         logger.warning("Docker daemon unavailable: %s", exc)
-        return []
+        return {
+            "available": False,
+            "reason": str(exc),
+            "containers": [],
+        }

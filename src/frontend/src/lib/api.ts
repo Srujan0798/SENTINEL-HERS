@@ -82,3 +82,16 @@ export interface AnomalyResult {
   is_anomaly: boolean;
   threshold: number;
 }
+
+export interface AnomalySeriesEntry {
+  service: string;
+  score: number;
+  is_anomaly: boolean;
+  threshold: number;
+}
+
+export interface AnomalySeriesData {
+  series: AnomalySeriesEntry[];
+  risk_level: "low" | "medium" | "high";
+  anomaly_alerts_count: number;
+}

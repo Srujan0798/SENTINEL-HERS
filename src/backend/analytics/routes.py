@@ -2,7 +2,7 @@
 from datetime import datetime, timedelta, timezone
 from typing import Optional
 
-from fastapi import APIRouter, Depends, Query
+from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy import func, text
 from sqlalchemy.orm import Session
 
@@ -109,4 +109,53 @@ async def alert_trend(
         "resolved_alerts": resolved,
         "open_alerts": total - resolved,
         "by_severity": by_severity,
+    }
+
+
+@router.get("/anomalies")
+async def anomaly_series(
+    db: Session = Depends(get_db),
+    current_user: dict = Depends(get_current_user_dependency),
+):
+    """Return scored anomaly series for tracked services plus overall risk level."""
+    from src.backend.ml.anomaly.detector import score_metric_stream
+    from src.backend.logs.models import AlertModel
+
+    services = ["api-gateway", "auth-service", "db-worker", "cache-layer"]
+    series = []
+    anomalous_count = 0
+
+    for svc in services:
+        metrics = [0.4]
+        try:
+            result = score_metric_stream(svc, metrics)
+        except Exception:
+            raise HTTPException(status_code=503, detail="Anomaly model unavailable")
+        entry = {
+            "service": svc,
+            "score": result.score,
+            "is_anomaly": result.is_anomaly,
+            "threshold": result.threshold,
+        }
+        series.append(entry)
+        if result.is_anomaly:
+            anomalous_count += 1
+
+    team_id = current_user["team_id"]
+    alert_count = db.query(AlertModel).filter(
+        AlertModel.team_id == team_id,
+        AlertModel.source == "anomaly-ml",
+    ).count()
+
+    if anomalous_count >= 2:
+        risk_level = "high"
+    elif anomalous_count == 1:
+        risk_level = "medium"
+    else:
+        risk_level = "low"
+
+    return {
+        "series": series,
+        "risk_level": risk_level,
+        "anomaly_alerts_count": alert_count,
     }

@@ -1,10 +1,14 @@
 """Anomaly detection API endpoints."""
+import uuid
+from datetime import datetime, timezone
+
 from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel
 from sqlalchemy.orm import Session
 
 from src.backend.auth.dependencies import get_current_user_dependency
 from src.backend.db import get_db
+from src.backend.logs.models import AlertModel, SeverityLevel
 
 router = APIRouter(prefix="/api/ml", tags=["ml"])
 
@@ -21,11 +25,38 @@ class TrainRequest(BaseModel):
 @router.post("/score")
 async def score_anomaly(
     body: ScoreRequest,
+    db: Session = Depends(get_db),
     current_user: dict = Depends(get_current_user_dependency),
 ):
     try:
         from src.backend.ml.anomaly.detector import score_metric_stream
         result = score_metric_stream(body.service, body.metrics)
+
+        # Auto-raise low-severity alert when the model flags an anomaly
+        if result.is_anomaly:
+            alert = AlertModel(
+                id=uuid.uuid4(),
+                team_id=current_user["team_id"],
+                source="anomaly-ml",
+                alert_type="ModelAnomaly",
+                title=f"Anomaly detected for {body.service} (score={result.score:.3f})",
+                description=(
+                    f"ML model flagged anomalous metric stream for {body.service}. "
+                    f"Score {result.score:.3f} below threshold {result.threshold:.3f}."
+                ),
+                severity=SeverityLevel.SEV4.value,
+                metadata_={
+                    "service": body.service,
+                    "score": result.score,
+                    "threshold": result.threshold,
+                    "ml_source": "isolation_forest",
+                },
+                fired_at=datetime.now(timezone.utc),
+                created_at=datetime.now(timezone.utc),
+            )
+            db.add(alert)
+            db.commit()
+
         return {
             "service": body.service,
             "score": result.score,

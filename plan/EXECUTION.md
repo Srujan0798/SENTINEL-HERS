@@ -11,8 +11,9 @@
 | W6 | task-sla-engine, incident-comms | ✅ SHIPPED | 11 passed |
 | W7 | analytics-dashboard, anomaly-ml, container-monitoring | ✅ SHIPPED | 12 passed |
 | W8 | demo-hardening, voice-to-ticket, deploy/observability | ✅ SHIPPED | 134 passed |
-| W9 | 9.1–9.6 offline ✅ | 🟧 HUMAN: push + live URLs | suite GREEN (150) · see `work/ETERNAL_PLAN.md` PHASE-H |
-| W10 | B anomaly · C containers · E voice · A chat · D postmortem · F urls · G CI | ⏳ OPENCODE | Round1 B∥C∥E → Round2 A→D → F · plan: `work/ETERNAL_PLAN.md` |
+| W9 | 9.1–9.6 offline ✅ | 🟧 HUMAN: push + live URLs | deploy clicks remaining |
+| W10 | chat · anomaly · containers · postmortem · voice · CI | ✅ greened | suite **183 passed** |
+| W11 | suite isolation fix + timeline bugfix | ✅ | 183 passed · URLs still human/agents |
 
 **⚠️ STATUS CORRECTION (2026-07-23, orchestrator-verified):** The "146 passing" claim below was
 **FALSE on a clean checkout** (FM-09). `src/backend/logs/` was never committed; its absence causes

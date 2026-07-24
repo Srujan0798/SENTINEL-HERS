@@ -1,5 +1,6 @@
 """Parse transcribed voice text into a structured incident via LLM."""
 import json
+import re
 from typing import Literal
 
 from pydantic import BaseModel, Field
@@ -31,32 +32,45 @@ class ParsedIncident(BaseModel):
 
 def parse_voice_to_incident(text: str, provider: AIProvider | None = None) -> ParsedIncident:
     """Use LLM to parse transcribed text into a structured incident."""
+    if not text or not text.strip():
+        raise ValueError("Transcription is empty — cannot parse incident from empty text")
+
     if provider is None:
         provider = get_provider()
 
-    response = provider.complete(
-        messages=[{"role": "user", "content": f"Parse this SRE voice note:\n\n{text}"}],
-        system=PARSE_SYSTEM_PROMPT,
-    )
+    try:
+        response = provider.complete(
+            messages=[{"role": "user", "content": f"Parse this SRE voice note:\n\n{text}"}],
+            system=PARSE_SYSTEM_PROMPT,
+        )
+    except Exception as exc:
+        raise ValueError(f"LLM parse call failed: {exc}") from exc
 
-    # Handle mock provider prefix
     clean = response.strip()
     if clean.startswith("[mock-ai]"):
-        # Mock provider returns a prefixed string; fall back to deterministic parse
         return _fallback_parse(text)
 
     try:
         data = json.loads(clean)
     except json.JSONDecodeError:
-        # Try to extract JSON from response (handle markdown fences)
-        import re
         match = re.search(r"\{.*\}", clean, re.DOTALL)
         if match:
-            data = json.loads(match.group())
+            try:
+                data = json.loads(match.group())
+            except json.JSONDecodeError:
+                return _fallback_parse(text)
         else:
             return _fallback_parse(text)
 
-    return ParsedIncident(**data)
+    try:
+        parsed = ParsedIncident(**data)
+    except Exception as exc:
+        raise ValueError(f"Parsed data did not match required schema: {exc}") from exc
+
+    if not parsed.title.strip():
+        raise ValueError("Parse produced an empty title — transcript may be incoherent")
+
+    return parsed
 
 
 def _fallback_parse(text: str) -> ParsedIncident:

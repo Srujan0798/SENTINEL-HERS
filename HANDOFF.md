@@ -1,20 +1,26 @@
 # HANDOFF — SENTINEL
 
-> Read FIRST. **Replace, never append.**
+> Replace, never append.
 
-- **Orchestrator:** plan/review only · **OpenCode:** labor · **Human:** push + deploy
-- **Paste packs (ready to copy):** `work/paste/` ← **START HERE**
-- **Master plan:** `work/ETERNAL_PLAN.md`
-- **Suite:** 150 passed (verified)
+## Ground truth (2026-07-24)
 
-## Active phase
-1. Human: `work/paste/HUMAN_DEPLOY.md`
-2. OpenCode Round1: paste `ROUND1_AGENT_B.md` · `C` · `E` (3 windows)
-3. Then Round2: `A` then `D`
-4. Then F (URLs) · optional G (CI)
+| Item | Status |
+|------|--------|
+| Full suite | ✅ **183 passed**, 0 failed |
+| Wave-10 features (chat, anomaly, containers, postmortem, voice, CI) | ✅ code landed + greened |
+| WRITEUP / walkthrough / deploy configs | ✅ offline done |
+| Live Render + Vercel URLs | 🟧 **URL agents / human** |
+| `git push` | 🟧 human (main ahead of origin) |
 
-## Ground truth
-Wave-9 offline ✅ · live URLs 🟥 · wave-10 ⏳ paste packs ready · main ahead of origin
+## Your only remaining path to submit
+1. `git push origin main`
+2. Render Blueprint + Vercel (Root=`src/frontend`)
+3. Paste live URLs into README (Agent F / URL agents)
+4. Submit: GitHub + live URL + WRITEUP
 
-## Next
-Open `work/paste/00_READ_ME_FIRST.md` and dispatch Round1.
+## Demo
+`demo@sentinel.io` / `Sentinel2026!`  
+Path: login → SEV1 → AI → assign/SLA → timeline → analytics → chat → postmortem
+
+## Resume
+This file → `plan/EXECUTION.md` → live URLs only.

@@ -54,6 +54,7 @@ def setup_db():
     app.dependency_overrides[get_db] = override_db
     Base.metadata.create_all(bind=engine)
     yield
+    app.dependency_overrides.clear()
     Base.metadata.drop_all(bind=engine)
     Path("test_vcs.db").unlink(missing_ok=True)
 

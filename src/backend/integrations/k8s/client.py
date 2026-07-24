@@ -1,22 +1,38 @@
-"""Kubernetes pod status reader — returns [] if kubeconfig unavailable."""
+"""Kubernetes pod status reader — graceful fallback if kubeconfig unavailable."""
 import logging
 from typing import Any
 
 logger = logging.getLogger(__name__)
 
+try:
+    from kubernetes import client as _k8s_client, config as _k8s_config
+    _K8S_AVAILABLE = True
+except ImportError:
+    _k8s_client = None
+    _k8s_config = None
+    _K8S_AVAILABLE = False
 
-def list_pods() -> list[dict[str, Any]]:
-    """Return running pods. Returns [] if kubeconfig not found (FM-11: fail gracefully)."""
+
+def list_pods() -> dict[str, Any]:
+    """Return running pods with availability info.
+
+    On success: {"available": True, "pods": [...]}
+    On failure: {"available": False, "reason": "<error>", "pods": []}
+    Never crashes — FM-11 fail loud via logging, graceful surface to caller.
+    """
+    if not _K8S_AVAILABLE:
+        return {
+            "available": False,
+            "reason": "kubernetes Python package not installed",
+            "pods": [],
+        }
     try:
-        from kubernetes import client, config
         try:
-            config.load_kube_config()
+            _k8s_config.load_kube_config()
         except Exception:
-            config.load_incluster_config()
+            _k8s_config.load_incluster_config()
 
-        v1 = client.CoreV1Api()
-        # Bound the call: an unreachable cluster must fail fast and fall through
-        # to the graceful [] below (FM-11) rather than block the request forever.
+        v1 = _k8s_client.CoreV1Api()
         pods = v1.list_pod_for_all_namespaces(watch=False, _request_timeout=3)
         result = []
         for pod in pods.items:
@@ -32,7 +48,11 @@ def list_pods() -> list[dict[str, Any]]:
                 "source": "kubernetes",
                 "namespace": pod.metadata.namespace,
             })
-        return result
+        return {"available": True, "reason": None, "pods": result}
     except Exception as exc:
         logger.warning("Kubernetes unavailable (no kubeconfig?): %s", exc)
-        return []
+        return {
+            "available": False,
+            "reason": str(exc),
+            "pods": [],
+        }

@@ -4,6 +4,9 @@ import React, { useCallback, useRef, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Textarea } from "@/components/ui/textarea";
 
 interface VoiceRecorderProps {
   teamId: string;
@@ -11,7 +14,7 @@ interface VoiceRecorderProps {
   apiBase?: string;
 }
 
-type RecordingState = "idle" | "recording" | "uploading" | "done" | "error";
+type RecordingState = "idle" | "recording" | "uploading" | "done" | "error" | "text-fallback" | "transcription-failed";
 
 export function VoiceRecorder({
   teamId,
@@ -22,6 +25,8 @@ export function VoiceRecorder({
   const [transcript, setTranscript] = useState<string | null>(null);
   const [incident, setIncident] = useState<Record<string, unknown> | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [fallbackText, setFallbackText] = useState<string>("");
+  const [fallbackTitle, setFallbackTitle] = useState<string>("");
 
   const mediaRecorderRef = useRef<MediaRecorder | null>(null);
   const chunksRef = useRef<Blob[]>([]);
@@ -52,8 +57,8 @@ export function VoiceRecorder({
 
       mediaRecorder.start();
     } catch {
-      setState("error");
-      setError("Microphone access denied");
+      setState("text-fallback");
+      setError("Microphone access denied. You can type your incident report below instead.");
     }
   }, []);
 
@@ -74,7 +79,11 @@ export function VoiceRecorder({
 
       if (!res.ok) {
         const body = await res.json().catch(() => ({}));
-        throw new Error(body.detail || `HTTP ${res.status}`);
+        const detail = body.detail || `HTTP ${res.status}`;
+        if (res.status === 502 || res.status === 500) {
+          throw new Error(`Transcription service error: ${detail}`);
+        }
+        throw new Error(detail);
       }
 
       const data = await res.json();
@@ -83,9 +92,59 @@ export function VoiceRecorder({
       setState("done");
       onIncidentCreated?.(data);
     } catch (err) {
-      setState("error");
-      setError(err instanceof Error ? err.message : "Upload failed");
+      const message = err instanceof Error ? err.message : "Upload failed";
+      if (message.includes("Transcription service error") || message.includes("Transcription rejected")) {
+        setState("transcription-failed");
+        setError(`Transcription failed: ${message}. You can try again or type your report instead.`);
+      } else {
+        setState("error");
+        setError(message);
+      }
     }
+  };
+
+  const submitTextFallback = async () => {
+    if (!fallbackTitle.trim() && !fallbackText.trim()) {
+      setError("Please enter at least a title or description.");
+      return;
+    }
+    setState("uploading");
+    setError(null);
+    try {
+      const res = await fetch(
+        `${apiBase}/api/incidents?team_id=${teamId}&actor=voice-text`,
+        {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            title: fallbackTitle.trim() || fallbackText.trim().slice(0, 100),
+            description: fallbackText.trim(),
+            severity: "SEV3",
+          }),
+        }
+      );
+
+      if (!res.ok) {
+        const body = await res.json().catch(() => ({}));
+        throw new Error(body.detail || `HTTP ${res.status}`);
+      }
+
+      const data = await res.json();
+      setIncident(data);
+      setTranscript(fallbackText || fallbackTitle);
+      setState("done");
+      onIncidentCreated?.(data);
+    } catch (err) {
+      setState("error");
+      setError(err instanceof Error ? err.message : "Failed to create incident from text");
+    }
+  };
+
+  const retryRecording = () => {
+    setState("idle");
+    setError(null);
+    setTranscript(null);
+    setIncident(null);
   };
 
   const severityColor: Record<string, string> = {
@@ -115,6 +174,9 @@ export function VoiceRecorder({
             <div className="flex justify-center">
               <Waveform />
             </div>
+            <div className="text-center text-xs text-muted-foreground">
+              Recording... speak now
+            </div>
             <Button
               onClick={stopRecording}
               variant="destructive"
@@ -128,7 +190,10 @@ export function VoiceRecorder({
 
         {state === "uploading" && (
           <div className="text-center text-sm text-muted-foreground py-4">
-            Transcribing &amp; creating incident...
+            <div className="flex items-center justify-center gap-2">
+              <TranscribingSpinner />
+              Transcribing &amp; creating incident...
+            </div>
           </div>
         )}
 
@@ -172,13 +237,61 @@ export function VoiceRecorder({
         {state === "error" && (
           <div className="space-y-2">
             <div className="text-sm text-destructive">{error}</div>
-            <Button
-              onClick={() => setState("idle")}
-              variant="outline"
-              className="w-full"
-            >
+            <Button onClick={retryRecording} variant="outline" className="w-full">
               Try Again
             </Button>
+          </div>
+        )}
+
+        {state === "transcription-failed" && (
+          <div className="space-y-3">
+            <div className="text-sm text-destructive">{error}</div>
+            <div className="space-y-2">
+              <Button onClick={retryRecording} variant="outline" className="w-full">
+                Try Microphone Again
+              </Button>
+              <Button
+                onClick={() => setState("text-fallback")}
+                variant="secondary"
+                className="w-full"
+              >
+                Type Incident Instead
+              </Button>
+            </div>
+          </div>
+        )}
+
+        {state === "text-fallback" && (
+          <div className="space-y-3">
+            <div className="text-sm text-muted-foreground">
+              Microphone was denied. Enter your incident details below.
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="fallback-title">Title</Label>
+              <Input
+                id="fallback-title"
+                placeholder="Brief incident title"
+                value={fallbackTitle}
+                onChange={(e) => setFallbackTitle(e.target.value)}
+              />
+              <Label htmlFor="fallback-desc">Description</Label>
+              <Textarea
+                id="fallback-desc"
+                placeholder="Describe what happened..."
+                value={fallbackText}
+                onChange={(e) => setFallbackText(e.target.value)}
+                rows={4}
+              />
+            </div>
+            <div className="flex gap-2">
+              <Button onClick={submitTextFallback} className="flex-1" size="lg">
+                Create Incident
+              </Button>
+              <Button onClick={retryRecording} variant="outline" className="flex-1">
+                Try Mic Again
+              </Button>
+            </div>
+            {error && <div className="text-sm text-destructive">{error}</div>}
           </div>
         )}
       </CardContent>
@@ -217,5 +330,29 @@ function Waveform() {
         />
       ))}
     </div>
+  );
+}
+
+function TranscribingSpinner() {
+  return (
+    <svg
+      xmlns="http://www.w3.org/2000/svg"
+      width="16"
+      height="16"
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="2"
+      className="animate-spin"
+    >
+      <line x1="12" y1="2" x2="12" y2="6" />
+      <line x1="12" y1="18" x2="12" y2="22" />
+      <line x1="4.93" y1="4.93" x2="7.76" y2="7.76" />
+      <line x1="16.24" y1="16.24" x2="19.07" y2="19.07" />
+      <line x1="2" y1="12" x2="6" y2="12" />
+      <line x1="18" y1="12" x2="22" y2="12" />
+      <line x1="4.93" y1="19.07" x2="7.76" y2="16.24" />
+      <line x1="16.24" y1="7.76" x2="19.07" y2="4.93" />
+    </svg>
   );
 }
