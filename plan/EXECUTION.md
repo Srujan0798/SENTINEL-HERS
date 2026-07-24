@@ -11,7 +11,7 @@
 | W6 | task-sla-engine, incident-comms | ✅ SHIPPED | 11 passed |
 | W7 | analytics-dashboard, anomaly-ml, container-monitoring | ✅ SHIPPED | 12 passed |
 | W8 | demo-hardening, voice-to-ticket, deploy/observability | ✅ SHIPPED | 134 passed |
-| W9 | restore-logs ✅`a7d4277`, green-suite, render-deploy, vercel-deploy, writeup, live-ai | 🟧 IN PROGRESS | 1/6 merged |
+| W9 | 9.1 logs ✅`a7d4277` · 9.2 suite ✅`4e84356` · 9.3 Render ✅`5e93840` · 9.6 AI ✅`285bb38` · 9.3b CORS/seed · 9.4 Vercel · 9.5 writeup | 🟧 IN PROGRESS | 4/6+ merged · suite GREEN (150) |
 | W10 | chatbot, predictive-anomaly, container-monitoring, postmortem-export, voice-e2e | ⏳ PENDING | — |
 
 **⚠️ STATUS CORRECTION (2026-07-23, orchestrator-verified):** The "146 passing" claim below was

@@ -3,38 +3,41 @@
 > Read this FIRST on any new session (FM-14). Then CLAUDE.md → plan/EXECUTION.md → active spec.
 > **Replace, never append** this file (kernel law #8).
 
-- **Active wave:** wave-9 (Submission Hardening) → wave-10 (Brownie & Rubric-Max)
-- **Overall status:** Waves 0–8 code is BUILT and on GitHub (`Srujan0798/SENTINEL-HERS`), BUT the
-  project is **NOT yet a valid submission** and had a **false-green regression** (see below).
+- **Active wave:** wave-9 (Submission Hardening) → wave-10 after 9.5 + live URLs
+- **Overall status:** Wave-9 code path is nearly submission-ready. Suite green. Deploy configs
+  present. **Live Render + Vercel clicks + WRITEUP still required** for a valid entry.
 
-## Ground truth as of 2026-07-23 (orchestrator-verified, not claimed)
-- ✅ Substantial real code: backend (all domain modules), Next.js 15 frontend, docker-compose, Prom/Grafana.
-- 🟥 **BROKEN:** `src/backend/logs/` package is **missing** — never committed. `ingest`, `ai`, `analytics`
-  and 8 test files import it, so the **test suite fails to collect** (8 errors). EXECUTION.md's
-  "146 passing" was FALSE on a clean checkout (FM-09). Real test count target: **150**.
-- 🟥 **No live deployment** (mandatory submission item). No `render.yaml` / `vercel.json`.
-- 🟥 **No `WRITEUP.md`** (mandatory submission item).
-- ⚠️ Only 3 commits — judges review commit logs. Wave-9/10 must land as meaningful incremental commits.
+## Ground truth as of 2026-07-24 (orchestrator-verified)
 
-## Decisions locked (by human, 2026-07-23)
+| Item | Status | Evidence |
+|---|---|---|
+| `src/backend/logs/` restored | ✅ | commit `a7d4277` |
+| Full pytest suite | ✅ | **150 passed** (post 9.6) · commit `4e84356` + AI wiring |
+| Live AI (Claude/Gemini + mock fallback) | ✅ | commit `285bb38` |
+| Render blueprint + Dockerfile | ✅ | commit `5e93840` · `render.yaml`, `Dockerfile.api`, `deployment/render/release.sh` |
+| CORS from `CORS_ORIGINS` + `requests` + idempotent seed | ✅ | uncommitted → about to merge as 9.3b |
+| Vercel frontend config + env wiring | ✅ | uncommitted → about to merge as 9.4 |
+| Live deploy URLs | 🟥 | **human action** — Render Blueprint + Vercel project |
+| `WRITEUP.md` | 🟥 | wave-9/05 — can draft offline; finalize after live URLs |
+| Wave-10 brownie | ⏳ | after suite stays green + optional after writeup |
+
+## Decisions locked (by human)
 1. **Deploy:** Render (backend + Postgres + Redis) + Vercel (frontend).
-2. **AI:** real Claude/Gemini keys available → wire live, keep mock fallback for tests.
-3. **Scope:** GO BIG — mandatory submission bar (wave-9) THEN brownie features (wave-10).
+2. **AI:** real Claude/Gemini keys available → wire live, mock fallback for tests.
+3. **Scope:** GO BIG — mandatory wave-9 bar, then wave-10 brownie.
 
 ## Next action (critical path)
-1. Dispatch **wave-9/01-restore-logs-module** FIRST — it is the blocker; nothing (tests, AI, analytics,
-   even backend boot) works without it.
-2. Then wave-9/02 (green suite). Then 9/03 (Render) → 9/04 (Vercel) → 9/05 (writeup) ; 9/06 (AI) after 9/01.
-3. Then wave-10 fan-out (all 5 brownie tasks) once the suite is green.
-4. See `work/DISPATCH.md` for the exact agent assignment + the worker prompt to prepend.
-
-## Dispatch order
-`9/01 → 9/02 → {9/03 → 9/04 → 9/05}  ∥  9/06` then `wave-10 (×5 parallel)`.
+1. Merge local 9.3b + 9.4 (if not yet committed).
+2. **Human (r3):** `git push` → Render Blueprint deploy → Vercel deploy (Root = `src/frontend`).
+3. Set Render `CORS_ORIGINS` to the Vercel origin; set Vercel `NEXT_PUBLIC_API_BASE_URL` to Render URL.
+4. Provide `ANTHROPIC_API_KEY` (and optional `GEMINI_API_KEY`) in Render dashboard only.
+5. Dispatch **9.5 WRITEUP** with the two live URLs.
+6. Fan out wave-10 (watch AI write-set collisions: 10.1 then 10.4 sequential).
 
 ## Open decisions for the human
-- Provide `ANTHROPIC_API_KEY` / `GEMINI_API_KEY` as Render + local env vars (never commit).
-- Perform the actual Render + Vercel deploy clicks (r3 blast radius — human action).
+- Confirm push + deploy clicks.
+- Drop API keys into Render (never commit).
+- Optional: prefer a custom Vercel domain name.
 
 ## How to resume
-1. Read this file. 2. CLAUDE.md (kernel). 3. plan/EXECUTION.md (wave status). 4. work/DISPATCH.md
-   (assignments + prompt). 5. orchestrator/agents/REGISTRY.md. 6. Continue from "Next action".
+1. This file → 2. `plan/EXECUTION.md` → 3. `work/DISPATCH.md` → 4. continue from "Next action".
