@@ -1,4 +1,5 @@
 import logging
+import os
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
@@ -14,9 +15,22 @@ try:
 except Exception as _e:
     logger.warning("DB migration skipped: %s", _e)
 
+# CORS allow-list from env (comma-separated). Falls back to localhost dev origins
+# when CORS_ORIGINS is unset so dev + tests are unchanged. Explicit allow-list only —
+# never "*" with credentials.
+_DEFAULT_CORS_ORIGINS = ["http://localhost:3000", "http://localhost:3001"]
+_cors_env = os.getenv("CORS_ORIGINS")
+if _cors_env:
+    cors_origins = [o.strip() for o in _cors_env.split(",") if o.strip()]
+else:
+    cors_origins = list(_DEFAULT_CORS_ORIGINS)
+if not cors_origins:
+    cors_origins = list(_DEFAULT_CORS_ORIGINS)
+logger.info("CORS allow-list: %s", cors_origins)
+
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["http://localhost:3000", "http://localhost:3001"],
+    allow_origins=cors_origins,
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],

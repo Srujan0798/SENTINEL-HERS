@@ -49,6 +49,25 @@ def main():
     print(f"  token acquired: {token[:30]}…")
     print(f"  team_id: {team_id}")
 
+    # Idempotency: if demo SEV1 (or any incident for this team) already exists, exit clean.
+    # Redeploys must NOT duplicate the demo dataset.
+    existing = get("/api/incidents", token, params={"team_id": team_id})
+    existing_list = []
+    if isinstance(existing, dict):
+        existing_list = existing.get("data") or existing.get("items") or existing.get("incidents") or []
+        if not existing_list and existing.get("id"):
+            existing_list = [existing]
+    elif isinstance(existing, list):
+        existing_list = existing
+    if existing_list:
+        titles = [str(i.get("title", "")) for i in existing_list if isinstance(i, dict)]
+        print(f"\n[skip] Demo data already present ({len(existing_list)} incident(s): {titles[:3]})")
+        print("=== Seed Complete (idempotent no-op) ===")
+        print(f"  Base URL:   {BASE_URL}")
+        print(f"  Email:      demo@sentinel.io")
+        print(f"  Password:   Sentinel2026!")
+        return
+
     # 2. Ingest logs
     print("\n[2] Ingesting sample logs…")
     now = datetime.datetime.now(datetime.UTC)

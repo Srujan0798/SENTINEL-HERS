@@ -47,10 +47,18 @@ No secret is ever stored in git — all keys are set in the Render dashboard (FM
 
 ## 2. Frontend on Vercel — click-path
 
-1. **Vercel → Add New → Project**, import the same repo, root = the Next.js app.
-2. Set env var `NEXT_PUBLIC_API_URL = https://sentinel-api.onrender.com` (your Render URL).
-3. Deploy. Note the resulting URL (e.g. `https://sentinel.vercel.app`).
-4. Go back to Render → `sentinel-api` → set `CORS_ORIGINS` to that URL → redeploy.
+1. **Vercel → Add New → Project**, import the same GitHub repo.
+2. **Root Directory = `src/frontend`** (critical — the Next.js app lives in the monorepo subdir).
+3. Framework preset: **Next.js** (auto-detected from `package.json` + `vercel.json`).
+4. Environment variables (Production + Preview):
+   | Name | Value |
+   |---|---|
+   | `NEXT_PUBLIC_API_BASE_URL` | `https://<your-render-service>.onrender.com` (no trailing slash) |
+   | `NEXT_PUBLIC_WS_URL` | same origin as above (optional; falls back to API base) |
+5. Deploy. Note the resulting URL (e.g. `https://sentinel.vercel.app`).
+6. Go back to Render → `sentinel-api` → set `CORS_ORIGINS` to that exact origin
+   (e.g. `https://sentinel.vercel.app`) → **Manual Deploy**. CORS is an explicit allow-list
+   (never `*` with credentials).
 
 ---
 
@@ -69,7 +77,8 @@ No secret is ever stored in git — all keys are set in the Render dashboard (FM
 | `GITHUB_WEBHOOK_SECRET` | **dashboard** | `sync: false` — optional | **secret** |
 | `GITLAB_WEBHOOK_SECRET` | **dashboard** | `sync: false` — optional | **secret** |
 | `CORS_ORIGINS` | **dashboard** | `sync: false` — set to the Vercel URL after frontend deploy | no |
-| `NEXT_PUBLIC_API_URL` | Vercel | the Render API URL | no |
+| `NEXT_PUBLIC_API_BASE_URL` | Vercel | the Render API origin (no trailing slash) | no |
+| `NEXT_PUBLIC_WS_URL` | Vercel | optional SSE/WS origin; defaults to API base | no |
 
 **No API key or secret is hardcoded anywhere.** Every secret is either
 Render-generated (`generateValue`) or dashboard-only (`sync: false`).
@@ -110,11 +119,10 @@ seed as the recovery baseline — it re-establishes the demo dataset on a fresh 
 
 ---
 
-## 6. Known follow-ups (outside this task's write-set)
+## 6. Deploy-hardening status (wave-9.3b)
 
-- `scripts/seed_demo.py` is not itself idempotent for incidents; the guard lives in
-  `release.sh`. Recommended: add an "existing demo team" guard inside the script.
-- `scripts/seed_demo.py` imports `requests`, which is not in `api/requirements.txt`.
-  `release.sh` installs it at release time; add `requests` to requirements to remove that.
-- `api/main.py` currently hardcodes CORS `allow_origins` to localhost. It must be
-  updated to read the `CORS_ORIGINS` env var for the Vercel origin to be accepted.
+Resolved:
+
+- `scripts/seed_demo.py` is idempotent (skips when the demo team already has incidents).
+- `requests>=2.31.0` is in `api/requirements.txt`.
+- `api/main.py` reads `CORS_ORIGINS` (comma-separated); falls back to localhost for dev/tests.
