@@ -11,8 +11,8 @@
 | W6 | task-sla-engine, incident-comms | ✅ SHIPPED | 11 passed |
 | W7 | analytics-dashboard, anomaly-ml, container-monitoring | ✅ SHIPPED | 12 passed |
 | W8 | demo-hardening, voice-to-ticket, deploy/observability | ✅ SHIPPED | 134 passed |
-| W9 | 9.1 logs ✅`a7d4277` · 9.2 suite ✅`4e84356` · 9.3 Render ✅`5e93840` · 9.3b CORS/seed ✅`258fc66` · 9.4 Vercel ✅`acccc70` · 9.6 AI ✅`285bb38` · 9.5 writeup ⏳ | 🟧 IN PROGRESS | 5/6 merged · suite GREEN (150) · needs live URLs + WRITEUP |
-| W10 | chatbot, predictive-anomaly, container-monitoring, postmortem-export, voice-e2e | ⏳ PENDING | — |
+| W9 | 9.1–9.6 offline ✅ (logs, suite, Render, CORS/seed, Vercel, AI, WRITEUP) | 🟧 HUMAN: live URLs | suite GREEN (150) · deploy clicks remaining |
+| W10 | chatbot, predictive-anomaly, container-monitoring, postmortem-export, voice-e2e | ⏳ OPENCODE | see `work/OPENCODE_DISPATCH.md` |
 
 **⚠️ STATUS CORRECTION (2026-07-23, orchestrator-verified):** The "146 passing" claim below was
 **FALSE on a clean checkout** (FM-09). `src/backend/logs/` was never committed; its absence causes

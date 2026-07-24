@@ -5,12 +5,35 @@
 > Slack + Grafana + Jira + GitHub + Notion toolchain with one coherent, real-time,
 > AI-native product.
 
-**Problem statement:** Sentinel — AI Native Engineering Operations Platform (Hard).
-Full brief in [PROBLEM_STATEMENT.md](PROBLEM_STATEMENT.md).
+**Problem statement:** Sentinel — AI Native Engineering Operations Platform (Hard).  
+Brief: [ps.md](ps.md) · Architecture: [plan/ARCHITECTURE.md](plan/ARCHITECTURE.md) · Write-up: [WRITEUP.md](WRITEUP.md)
 
-![status](https://img.shields.io/badge/tests-146%20passing-brightgreen)
+![status](https://img.shields.io/badge/tests-150%20passing-brightgreen)
 ![backend](https://img.shields.io/badge/backend-FastAPI-009688)
 ![frontend](https://img.shields.io/badge/frontend-Next.js%2015-black)
+![deploy](https://img.shields.io/badge/deploy-Render%20%2B%20Vercel-blue)
+
+| | URL |
+|---|---|
+| **GitHub** | https://github.com/Srujan0798/SENTINEL-HERS |
+| **Live frontend (Vercel)** | _Set after deploy_ → `https://<your-app>.vercel.app` (see [docs/DEPLOYMENT.md](docs/DEPLOYMENT.md)) |
+| **Live backend (Render)** | _Set after deploy_ → `https://<your-service>.onrender.com` |
+| **API health** | `https://<your-service>.onrender.com/healthz` |
+| **OpenAPI** | `https://<your-service>.onrender.com/api/docs` |
+
+> After you deploy, replace the two placeholder rows above with the real HTTPS URLs (submission requirement).
+
+---
+
+## Demo login (seeded)
+
+| Field | Value |
+|-------|--------|
+| Email | `demo@sentinel.io` |
+| Password | `Sentinel2026!` |
+
+Sacred judge path: **Login → SEV1 dashboard → AI summary + root cause → assign/SLA → timeline → analytics**.  
+Step-by-step: [docs/PRODUCTION_WALKTHROUGH.md](docs/PRODUCTION_WALKTHROUGH.md).
 
 ---
 
@@ -29,8 +52,8 @@ Full brief in [PROBLEM_STATEMENT.md](PROBLEM_STATEMENT.md).
 | Task assignment, escalation, SLA-aware workflow | ✅ |
 | Analytics: MTTR, incident frequency, top errors, alert trends | ✅ |
 
-**Exceptional features (all implemented):**
-Conversational RAG chatbot · Docker + Kubernetes monitoring · Auto-generated postmortems ·
+**Exceptional / brownie features (code present — wave-10 hardens + proves):**  
+Conversational RAG chatbot · Docker + Kubernetes monitoring · Auto-generated postmortems ·  
 Voice-to-ticket · Predictive anomaly detection (IsolationForest).
 
 ---
@@ -54,47 +77,52 @@ Voice-to-ticket · Predictive anomaly detection (IsolationForest).
                        (SQLite in tests)          (cache/pub-sub)  (Claude/Gemini/mock)
 ```
 
-- **Shared SQLAlchemy Base** with portable column types → the full test suite runs on
-  SQLite with no external services.
-- **AI provider abstraction** (Claude / Gemini / deterministic mock) → graceful degradation
-  and deterministic tests.
-- **Realtime hub** (SSE + WebSockets, Redis-pub/sub ready) for incident + comms fan-out.
-- **Self-observing**: the platform exposes its own Prometheus metrics and ships a Grafana
-  dashboard + alert rules.
+- **Shared SQLAlchemy Base** with portable column types → full suite on SQLite, no external services.
+- **AI provider abstraction** (Claude / Gemini / deterministic mock) → live demo + offline tests.
+- **Realtime hub** (SSE + WebSockets) for incident + comms fan-out.
+- **Self-observing:** Prometheus metrics + Grafana assets ship in-repo.
 
-Design details: [plan/ARCHITECTURE.md](plan/ARCHITECTURE.md) · [plan/PRD.md](plan/PRD.md).
+Design: [plan/ARCHITECTURE.md](plan/ARCHITECTURE.md) · Product: [plan/PRD.md](plan/PRD.md) · Write-up: [WRITEUP.md](WRITEUP.md).
 
 ---
 
-## Quick start
+## Quick start (local)
 
 ```bash
-cp .env.example .env          # set JWT_SECRET + JWT_REFRESH_SECRET (and optional AI keys)
+cp .env.example .env          # set JWT_SECRET + JWT_REFRESH_SECRET (optional AI keys)
 make up                       # postgres, redis, api, frontend, prometheus, grafana
-make seed                     # realistic SEV1 incident + logs + alerts + anomalies
-open http://localhost:3000    # login: demo@sentinel.io / Sentinel2026!
+make seed                     # SEV1 + logs + alerts + anomalies (idempotent)
+open http://localhost:3000    # demo@sentinel.io / Sentinel2026!
 ```
 
 | Service | URL |
 |---------|-----|
 | Frontend | http://localhost:3000 |
-| API + OpenAPI docs | http://localhost:8000 · http://localhost:8000/api/docs |
+| API + OpenAPI | http://localhost:8000 · http://localhost:8000/api/docs |
 | Prometheus | http://localhost:9090 |
 | Grafana (admin/admin) | http://localhost:3001 |
 
-Full instructions + local-dev (no Docker) path: [HOW_TO_RUN.md](HOW_TO_RUN.md).
+Full local paths: [HOW_TO_RUN.md](HOW_TO_RUN.md) · Cloud deploy: [docs/DEPLOYMENT.md](docs/DEPLOYMENT.md).
+
+### Production env (minimum)
+
+| Where | Variable | Notes |
+|-------|----------|--------|
+| Render | `ANTHROPIC_API_KEY` | dashboard-only secret |
+| Render | `CORS_ORIGINS` | exact Vercel origin, e.g. `https://foo.vercel.app` |
+| Vercel | `NEXT_PUBLIC_API_BASE_URL` | Render origin, no trailing slash |
+| Vercel project | **Root Directory** | `src/frontend` |
 
 ---
 
 ## Tests
 
 ```bash
-make test-fast    # ~15s, 134 tests (skips slow ML training)
-make test-full    # full suite incl. IsolationForest training (146 tests)
+# from repo root, with venv active
+python -m pytest -q          # full suite — currently 150 passed
 ```
 
-**146 tests passing** across unit + integration (auth, RBAC, incidents, logs, AI, comms,
-VCS, SLA, analytics, anomaly).
+**150 tests passing** (unit + integration; mock AI; SQLite). Verified after wave-9 hardening.
 
 ---
 
@@ -103,35 +131,44 @@ VCS, SLA, analytics, anomaly).
 | Layer | Choice |
 |-------|--------|
 | Frontend | Next.js 15, React 19, Tailwind, shadcn/ui |
-| Backend | FastAPI (Python 3.11), SQLAlchemy 2, Pydantic 2 |
+| Backend | FastAPI (Python 3.11+), SQLAlchemy 2, Pydantic 2 |
 | Database | PostgreSQL (prod) · SQLite (tests) |
 | Realtime | Server-Sent Events + WebSockets |
 | AI | Anthropic Claude / Google Gemini / mock provider |
 | ML | scikit-learn (IsolationForest) |
 | Observability | Prometheus + Grafana |
-| Deploy | Docker + Docker Compose |
+| Deploy | Docker · Render Blueprint · Vercel |
 
 ---
 
 ## Repository layout
 
 ```
-api/              FastAPI entrypoint (main.py), startup migrations, requirements
-src/backend/      16 feature modules (auth, incidents, ai, comms, ml, …)
-src/frontend/     Next.js app (app router, components, lib)
+api/              FastAPI entrypoint, startup migrations, requirements
+src/backend/      Feature modules (auth, incidents, ai, comms, ml, …)
+src/frontend/     Next.js app (Root Directory for Vercel)
 tests/            unit + integration suites
-deployment/       Prometheus + Grafana provisioning
+deployment/       Prometheus, Grafana, Render release.sh
 scripts/          seed_demo.py
 plan/             PRD, ARCHITECTURE, EXECUTION tracker
-docs/             SUBMISSION.md, scope, decisions, schemas
+work/             Task files + worker reports (orchestration)
+docs/             Deployment, walkthrough, scope, security
+WRITEUP.md        1–2 page technical write-up (submission required)
 ```
 
 ---
 
-## Submission
+## Submission checklist
 
-Mid-term evaluation answers and the functional-requirement → code map:
-[docs/SUBMISSION.md](docs/SUBMISSION.md).
+- [x] Public GitHub repo with meaningful commit history  
+- [x] README with setup + demo path  
+- [x] `WRITEUP.md` (technical decisions, challenges, more time)  
+- [x] Green automated tests (150)  
+- [x] Deploy configs (`render.yaml`, `src/frontend/vercel.json`)  
+- [ ] Live deployment URLs embedded above (human: push + Render + Vercel)  
+- [ ] Optional: wave-10 brownie harden via OpenCode agents (`work/OPENCODE_DISPATCH.md`)
 
-> Built solo by Choda Srujan Sai (23110081) for METIS Summer Siege. The backend was
-> developed wave-by-wave with an AI orchestration workflow (see `plan/EXECUTION.md`).
+Mid-term form drafts: [docs/SUBMISSION.md](docs/SUBMISSION.md).
+
+> Built by Choda Srujan Sai (23110081) for METIS Summer Siege — dual-tier AI orchestration
+> (see `plan/EXECUTION.md`, `work/DISPATCH.md`).
