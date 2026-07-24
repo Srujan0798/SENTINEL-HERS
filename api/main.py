@@ -18,7 +18,12 @@ except Exception as _e:
 # CORS allow-list from env (comma-separated). Falls back to localhost dev origins
 # when CORS_ORIGINS is unset so dev + tests are unchanged. Explicit allow-list only —
 # never "*" with credentials.
-_DEFAULT_CORS_ORIGINS = ["http://localhost:3000", "http://localhost:3001"]
+_DEFAULT_CORS_ORIGINS = [
+    "http://localhost:3000",
+    "http://localhost:3001",
+    "https://sentinel-hers.vercel.app",
+    "https://sentinel-hers-git-main-srujan-sais-projects.vercel.app",
+]
 _cors_env = os.getenv("CORS_ORIGINS")
 if _cors_env:
     cors_origins = [o.strip() for o in _cors_env.split(",") if o.strip()]
