@@ -265,6 +265,20 @@ class TestProviderAbstraction:
         p = get_provider()
         assert isinstance(p, MockProvider)
 
+    def test_claude_without_key_falls_back_to_mock_and_warns(self, caplog):
+        """No key set -> mock path works AND fails loud (WARNING logged, not silent)."""
+        # clear=True removes any ANTHROPIC_API_KEY that might be in the shell env.
+        with patch.dict("os.environ", {"AI_PROVIDER": "claude"}, clear=True):
+            with caplog.at_level("WARNING"):
+                from src.backend.ai.provider import get_provider, MockProvider
+
+                p = get_provider()
+        assert isinstance(p, MockProvider)
+        # Proves the fallback is loud, not a silent mask (FM-11).
+        assert any("ANTHROPIC_API_KEY" in r.message for r in caplog.records)
+        # Mock still produces deterministic output with no network/key.
+        assert "[mock-ai]" in p.complete([{"role": "user", "content": "hi"}])
+
     @patch.dict("os.environ", {"AI_PROVIDER": "claude", "ANTHROPIC_API_KEY": "test-key"})
     def test_get_provider_returns_claude(self):
         mock_anthropic = MagicMock()
