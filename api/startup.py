@@ -35,3 +35,11 @@ def run_migrations() -> None:
             logger.info("Default roles seeded")
 
     logger.info("DB migrations complete — %d tables", len(Base.metadata.tables))
+
+    # Ensure judge demo path exists after every boot (idempotent).
+    try:
+        from src.backend.seed.service import auto_seed_if_enabled
+
+        auto_seed_if_enabled()
+    except Exception:
+        logger.exception("Auto demo seed failed (non-fatal)")

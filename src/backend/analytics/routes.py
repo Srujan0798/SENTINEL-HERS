@@ -46,13 +46,16 @@ async def incident_summary(
         by_severity[r.severity] = by_severity.get(r.severity, 0) + 1
         by_status[r.status] = by_status.get(r.status, 0) + 1
 
+    open_count = total - len(resolved)
     return {
         "period_days": days,
         "total_incidents": total,
+        "open_incidents": open_count,
+        "resolved_incidents": len(resolved),
         "by_severity": by_severity,
         "by_status": by_status,
         "mttr_minutes": round(mttr_minutes, 1),
-        "resolved_count": len(resolved),
+        "resolved_count": len(resolved),  # alias for older clients
     }
 
 

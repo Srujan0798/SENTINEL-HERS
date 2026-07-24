@@ -78,7 +78,14 @@ services:
       - key: GITLAB_WEBHOOK_SECRET
         sync: false
 
-      # CORS — placeholder. MUST be updated to the real Vercel URL after the
-      # frontend is deployed (see docs/DEPLOYMENT.md). Comma-separated origins.
+      # CORS — production frontend origin (comma-separated if multiple).
       - key: CORS_ORIGINS
-        sync: false
+        value: "https://sentinel-hers.vercel.app"
+
+      # Demo seed — boot + preDeploy ensure demo@sentinel.io + SEV1 exist.
+      - key: AUTO_SEED_DEMO
+        value: "true"
+      - key: SEED_SECRET
+        generateValue: true
+      - key: ENV
+        value: production

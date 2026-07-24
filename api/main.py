@@ -8,12 +8,12 @@ logger = logging.getLogger(__name__)
 
 app = FastAPI(title="SENTINEL API", version="1.0.0", docs_url="/api/docs", redoc_url="/api/redoc")
 
-# Run DB migrations before handling any request
+# Run DB migrations + optional demo auto-seed before handling any request
 try:
     from api.startup import run_migrations
     run_migrations()
 except Exception as _e:
-    logger.warning("DB migration skipped: %s", _e)
+    logger.warning("DB migration/auto-seed skipped: %s", _e)
 
 # CORS allow-list from env (comma-separated). Falls back to localhost dev origins
 # when CORS_ORIGINS is unset so dev + tests are unchanged. Explicit allow-list only —
