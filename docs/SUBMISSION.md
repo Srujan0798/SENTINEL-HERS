@@ -14,7 +14,7 @@
 | Roll Number | 23110081 |
 | Problem statement | **Sentinel — AI Native Engineering Operations Platform (Hard)** |
 | GitHub Repository Link | `https://github.com/Srujan0798/SENTINEL-HERS` |
-| Live Deployment Link (optional) | `https://sentinel-api-clu9.onrender.com` |
+| Live Deployment Link (optional) | Frontend: `https://sentinel-hers-git-main-srujan-sais-projects.vercel.app` · Backend: `https://sentinel-api-clu9.onrender.com` |
 | Demo Video Link (optional) | *(optional — record 2-min Loom walking the demo path)* |
 
 ---
@@ -24,7 +24,7 @@
 SENTINEL is functionally complete end-to-end. All 10 core functional requirements are
 implemented and tested, plus all 5 "exceptional" features.
 
-**Backend (FastAPI, 16 modules, 47 endpoints, 146 tests passing):**
+**Backend (FastAPI, 16 modules, 47 endpoints, 183 tests passing):**
 - Team-based auth + JWT (access/refresh) with RBAC
 - Incident lifecycle: severity (SEV1–4), status transitions, triage, assignment, escalation
 - Centralised log + alert ingestion and search
@@ -48,7 +48,7 @@ containers), analytics, deployments. Realtime SSE status indicator.
 health-checked), Prometheus alert rules, Grafana dashboard auto-provisioned, one-command
 seed script for the demo path.
 
-Status: **146/146 tests green; frontend builds clean.** Remaining work is polish:
+Status: **183/183 tests green; frontend builds clean.** Remaining work is polish:
 production deploy, demo video, and a few UX refinements.
 
 ---
@@ -142,6 +142,6 @@ Pointers on a free/low-cost hosting path for a multi-service Docker Compose app
 - [x] Confirm `.env` is NOT in the repo (it is gitignored)
 - [x] Paste GitHub link into the form
 - [x] Deploy backend to Render ✅ (`https://sentinel-api-clu9.onrender.com`)
-- [ ] Deploy frontend to Vercel
+- [x] Deploy frontend to Vercel (preview at `https://sentinel-hers-git-main-srujan-sais-projects.vercel.app` — set custom domain at Vercel dashboard)
 - [ ] (Optional) Record 2-min demo video of the demo path in `HOW_TO_RUN.md`
 - [ ] Submit form

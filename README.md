@@ -8,7 +8,7 @@
 **Problem statement:** Sentinel — AI Native Engineering Operations Platform (Hard).  
 Brief: [ps.md](ps.md) · Architecture: [plan/ARCHITECTURE.md](plan/ARCHITECTURE.md) · Write-up: [WRITEUP.md](WRITEUP.md)
 
-![status](https://img.shields.io/badge/tests-150%20passing-brightgreen)
+![status](https://img.shields.io/badge/tests-183%20passing-brightgreen)
 ![backend](https://img.shields.io/badge/backend-FastAPI-009688)
 ![frontend](https://img.shields.io/badge/frontend-Next.js%2015-black)
 ![deploy](https://img.shields.io/badge/deploy-Render%20%2B%20Vercel-blue)
@@ -16,7 +16,7 @@ Brief: [ps.md](ps.md) · Architecture: [plan/ARCHITECTURE.md](plan/ARCHITECTURE.
 | | URL |
 |---|---|
 | **GitHub** | https://github.com/Srujan0798/SENTINEL-HERS |
-| **Live frontend (Vercel)** | _Set after deploy_ → `https://sentinel-hers.vercel.app` (see [docs/DEPLOYMENT.md](docs/DEPLOYMENT.md)) |
+| **Live frontend (Vercel)** | `https://sentinel-hers-git-main-srujan-sais-projects.vercel.app` (custom domain `sentinel-hers.vercel.app` — set via Vercel dashboard → Settings → Domains) |
 | **Live backend (Render)** | `https://sentinel-api-clu9.onrender.com` |
 | **API health** | `https://sentinel-api-clu9.onrender.com/healthz` |
 | **OpenAPI** | `https://sentinel-api-clu9.onrender.com/api/docs` |
@@ -117,10 +117,10 @@ Full local paths: [HOW_TO_RUN.md](HOW_TO_RUN.md) · Cloud deploy: [docs/DEPLOYME
 
 ```bash
 # from repo root, with venv active
-python -m pytest -q          # full suite — currently 150 passed
+python -m pytest -q          # full suite — currently 183 passed
 ```
 
-**150 tests passing** (unit + integration; mock AI; SQLite). Verified after wave-9 hardening.
+**183 tests passing** (unit + integration; mock AI; SQLite). Verified after wave-11 isolation + auth hardening.
 
 ---
 
@@ -161,9 +161,9 @@ WRITEUP.md        1–2 page technical write-up (submission required)
 - [x] Public GitHub repo with meaningful commit history  
 - [x] README with setup + demo path  
 - [x] `WRITEUP.md` (technical decisions, challenges, more time)  
-- [x] Green automated tests (150)  
+- [x] Green automated tests (183)  
 - [x] Deploy configs (`render.yaml`, `src/frontend/vercel.json`)  
-- [ ] Live deployment URLs embedded above (human: push + Render + Vercel)  
+- [x] Live deployment URLs embedded above (preview — set Vercel custom domain at https://vercel.com/srujan0798/sentinel-hers/settings/domains)  
 - [ ] Optional: wave-10 brownie harden via OpenCode agents (`work/OPENCODE_DISPATCH.md`)
 
 Mid-term form drafts: [docs/SUBMISSION.md](docs/SUBMISSION.md).
