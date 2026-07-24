@@ -1,12 +1,15 @@
 """GitHub webhook ingestion + deployment/commit listing."""
 import hashlib
 import hmac
+import logging
 import os
 import uuid
 from datetime import datetime
 
 from fastapi import APIRouter, Depends, Header, HTTPException, Query, Request, status
 from sqlalchemy.orm import Session
+
+logger = logging.getLogger(__name__)
 
 from src.backend.auth.dependencies import get_current_user_dependency
 from src.backend.db import get_db
@@ -90,7 +93,7 @@ async def github_webhook(
                 "id": dep.id, "service": dep.service, "status": dep.status
             }))
         except Exception:
-            pass
+            logger.warning("Failed to publish deployment realtime event")
 
     elif event == "push":
         repo_name = payload.get("repository", {}).get("name", "unknown")

@@ -1,7 +1,11 @@
 """AI endpoints — summary generation, root-cause analysis, conversational chat, and postmortem export."""
+import logging
 from typing import Any
 
 from fastapi import APIRouter, Depends, HTTPException, Query, status
+from fastapi.responses import PlainTextResponse
+
+logger = logging.getLogger(__name__)
 from fastapi.responses import PlainTextResponse
 from pydantic import BaseModel
 from sqlalchemy.orm import Session
@@ -168,7 +172,7 @@ async def get_incident_root_causes(
             for d in deploy_rows
         ]
     except Exception:
-        pass
+        logger.warning("Failed to fetch deployments for root-cause context")
 
     incident_dict = _serialize_incident(inc)
 

@@ -8,7 +8,7 @@ const BASE =
 
 function getToken(): string | null {
   if (typeof window === "undefined") return null;
-  return localStorage.getItem("sentinel_token");
+  return localStorage.getItem("access_token") || localStorage.getItem("sentinel_token");
 }
 
 async function request<T>(path: string, options: RequestInit = {}): Promise<T> {
@@ -41,7 +41,7 @@ export interface Incident {
   title: string;
   description: string;
   severity: "SEV1" | "SEV2" | "SEV3" | "SEV4";
-  status: "open" | "investigating" | "mitigating" | "resolved" | "closed";
+  status: "detected" | "triaging" | "investigating" | "mitigating" | "resolved" | "closed";
   created_at: string;
   updated_at: string;
   resolved_at?: string;

@@ -1,9 +1,12 @@
 """AI incident summary generation with Redis cache."""
 import json
+import logging
 import os
 from typing import Any
 
 from src.backend.ai.provider import get_provider
+
+logger = logging.getLogger(__name__)
 
 
 CACHE_TTL = 300  # 5 min
@@ -72,6 +75,6 @@ Write the 3-paragraph summary now:"""
         try:
             r.setex(cache_key, CACHE_TTL, summary)
         except Exception:
-            pass
+            logger.warning("Failed to cache AI summary in Redis")
 
     return summary

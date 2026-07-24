@@ -118,6 +118,66 @@ class GeminiProvider(AIProvider):
             ) from exc
 
 
+class OpenRouterProvider(AIProvider):
+    """Provider that routes through OpenRouter for broad model access."""
+
+    def __init__(self):
+        import openai
+        self._client = openai.OpenAI(
+            api_key=os.environ["OPENROUTER_API_KEY"],
+            base_url="https://openrouter.ai/api/v1",
+            timeout=_REQUEST_TIMEOUT,
+        )
+        self._model = os.getenv("AI_MODEL") or "openai/gpt-4o-mini"
+
+    def complete(self, messages: list[dict[str, str]], system: str = "") -> str:
+        openai_messages = []
+        if system:
+            openai_messages.append({"role": "system", "content": system})
+        for m in messages:
+            role = "assistant" if m["role"] == "assistant" else m["role"]
+            openai_messages.append({"role": role, "content": m["content"]})
+        try:
+            response = self._client.chat.completions.create(
+                model=self._model,
+                messages=openai_messages,
+                max_tokens=2048,
+            )
+            return response.choices[0].message.content or ""
+        except Exception as exc:
+            raise AIProviderError(f"OpenRouter call failed: {exc}") from exc
+
+
+class NvidiaProvider(AIProvider):
+    """Provider for NVIDIA NIM API."""
+
+    def __init__(self):
+        import openai
+        self._client = openai.OpenAI(
+            api_key=os.environ["NVAPI_KEY"],
+            base_url="https://integrate.api.nvidia.com/v1",
+            timeout=_REQUEST_TIMEOUT,
+        )
+        self._model = os.getenv("AI_MODEL") or "meta/llama-3.1-405b-instruct"
+
+    def complete(self, messages: list[dict[str, str]], system: str = "") -> str:
+        openai_messages = []
+        if system:
+            openai_messages.append({"role": "system", "content": system})
+        for m in messages:
+            role = "assistant" if m["role"] == "assistant" else m["role"]
+            openai_messages.append({"role": role, "content": m["content"]})
+        try:
+            response = self._client.chat.completions.create(
+                model=self._model,
+                messages=openai_messages,
+                max_tokens=2048,
+            )
+            return response.choices[0].message.content or ""
+        except Exception as exc:
+            raise AIProviderError(f"NVIDIA API call failed: {exc}") from exc
+
+
 class MockProvider(AIProvider):
     """Fallback provider used when no API key is configured (tests/CI/offline)."""
 
@@ -138,7 +198,7 @@ def _fallback_to_mock(provider: str, missing_key: str) -> MockProvider:
 
 
 def get_provider() -> AIProvider:
-    """Factory: reads AI_PROVIDER env var (claude|gemini|mock). Defaults to mock.
+    """Factory: reads AI_PROVIDER env var (claude|gemini|openrouter|nvidia|mock).
 
     If the chosen live provider's key is absent, fall back to mock but log a
     clear WARNING (fail safe + loud, never a silent mask).
@@ -152,4 +212,12 @@ def get_provider() -> AIProvider:
         if not os.getenv("GEMINI_API_KEY"):
             return _fallback_to_mock("gemini", "GEMINI_API_KEY")
         return GeminiProvider()
+    if provider == "openrouter":
+        if not os.getenv("OPENROUTER_API_KEY"):
+            return _fallback_to_mock("openrouter", "OPENROUTER_API_KEY")
+        return OpenRouterProvider()
+    if provider == "nvidia":
+        if not os.getenv("NVAPI_KEY"):
+            return _fallback_to_mock("nvidia", "NVAPI_KEY")
+        return NvidiaProvider()
     return MockProvider()

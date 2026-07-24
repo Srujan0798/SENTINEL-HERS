@@ -132,7 +132,8 @@ class CommsService:
         """Return all team members for @mention autocomplete."""
         try:
             return self._team_users(team_id)
-        except Exception:
+        except Exception as exc:
+            logger.warning("Failed to list team members: %s", exc)
             return []
 
     def get_channel_for_incident(
@@ -305,8 +306,8 @@ class CommsService:
         hub = get_hub()
         try:
             await hub.initialize()
-        except Exception:
-            pass
+        except Exception as exc:
+            logger.warning("Hub init failed: %s", exc)
         await hub.publish(str(team_id), event_type, payload)
 
     def _publish_sync(self, team_id: str, event_type: str, payload: dict[str, Any]):
@@ -317,8 +318,8 @@ class CommsService:
         for conn in conns:
             try:
                 conn.queue.put_nowait(event)
-            except Exception:
-                pass
+            except Exception as exc:
+                logger.debug("Sync fan-out to conn failed: %s", exc)
 
     def _parse_mentions(self, body: str, team_id: str) -> list[dict[str, Any]]:
         """Extract @user tokens. If a registered team member matches, return user_id."""
