@@ -1,32 +1,20 @@
 # HANDOFF — SENTINEL
 
-> Read FIRST (FM-14). Then `work/ETERNAL_PLAN.md` → `plan/EXECUTION.md` → active task.  
-> **Replace, never append.**
+> Read FIRST. **Replace, never append.**
 
-- **Role split:** Tier-1 orchestrator (plan/review/merge) · Tier-2 OpenCode workers (labor) · Human (push + deploy clicks)
-- **Law:** Adaptoid Lite SHIP + dual-tier · FM-09 evidence · FM-13 disjoint write-sets
-- **Active phase:** **PHASE-H (human deploy)** then **Round-1 agents B∥C∥E**
-- **Master plan:** `work/ETERNAL_PLAN.md` (all steps + exact agent paste packs)
-- **Dispatch short form:** `work/OPENCODE_DISPATCH.md`
+- **Orchestrator:** plan/review only · **OpenCode:** labor · **Human:** push + deploy
+- **Paste packs (ready to copy):** `work/paste/` ← **START HERE**
+- **Master plan:** `work/ETERNAL_PLAN.md`
+- **Suite:** 150 passed (verified)
 
-## Ground truth (2026-07-24)
+## Active phase
+1. Human: `work/paste/HUMAN_DEPLOY.md`
+2. OpenCode Round1: paste `ROUND1_AGENT_B.md` · `C` · `E` (3 windows)
+3. Then Round2: `A` then `D`
+4. Then F (URLs) · optional G (CI)
 
-| Item | Status |
-|------|--------|
-| Offline wave-9 (logs, suite 150, Render, CORS/seed, Vercel, AI, WRITEUP) | ✅ DONE |
-| Local commits ahead of origin | ⚠️ **~10 commits not pushed** |
-| Live Render + Vercel URLs | 🟥 HUMAN |
-| Wave-10 brownie prove | ⏳ OpenCode A–E |
-| CI shield | ⏳ optional Agent G |
+## Ground truth
+Wave-9 offline ✅ · live URLs 🟥 · wave-10 ⏳ paste packs ready · main ahead of origin
 
-## Next action (critical path)
-
-1. Human: push + PHASE-H deploy (ETERNAL_PLAN §3).  
-2. Dispatch OpenCode **B · C · E** in parallel (ETERNAL_PLAN §5–6).  
-3. Orchestrator: review reports → merge → then **A → D** → Agent F URLs → PHASE-Z freeze.
-
-## Locked decisions
-Render+Vercel · live AI keys dashboard-only · GO BIG (mandatory then brownie).
-
-## How to resume
-`HANDOFF.md` → `work/ETERNAL_PLAN.md` → say `status` or paste agent report.
+## Next
+Open `work/paste/00_READ_ME_FIRST.md` and dispatch Round1.
