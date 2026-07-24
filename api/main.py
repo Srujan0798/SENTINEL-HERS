@@ -91,3 +91,6 @@ app.include_router(containers_router)
 
 from src.backend.voice.routes import router as voice_router
 app.include_router(voice_router)
+
+from src.backend.seed.routes import router as seed_router
+app.include_router(seed_router)
