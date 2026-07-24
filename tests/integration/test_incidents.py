@@ -8,6 +8,7 @@ from sqlalchemy.orm import sessionmaker
 
 sys.path.insert(0, str(Path(__file__).parent.parent.parent))
 
+from src.backend.auth.dependencies import get_current_user_dependency
 from src.backend.incidents.database import Base, get_db
 from src.backend.incidents.models import Incident, TimelineEvent
 from src.backend.incidents.enums import IncidentStatus, SeverityLevel
@@ -38,6 +39,14 @@ def setup_db():
     Base.metadata.create_all(bind=engine)
     yield
     app.dependency_overrides.pop(get_db, None)
+
+@pytest.fixture(autouse=True, scope="module")
+def override_auth():
+    async def fake_user():
+        return {"user_id": USER_ID, "team_id": TEAM_ID, "role_id": "00000000-0000-0000-0000-000000000001"}
+    app.dependency_overrides[get_current_user_dependency] = fake_user
+    yield
+    app.dependency_overrides.pop(get_current_user_dependency, None)
 
 @pytest.fixture(autouse=True)
 def clean_tables():

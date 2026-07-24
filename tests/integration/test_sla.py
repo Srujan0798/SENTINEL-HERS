@@ -72,7 +72,7 @@ def incident_id(auth):
     resp = client.post(
         "/api/incidents",
         json={"title": "DB connection pool exhausted", "severity": "SEV2"},
-        params={"team_id": auth["team_id"]},
+        headers=auth["headers"],
     )
     assert resp.status_code == 201
     return resp.json()["id"]

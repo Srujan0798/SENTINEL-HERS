@@ -94,7 +94,7 @@ def incident_id(auth):
     resp = client.post(
         "/api/incidents",
         json={"title": "Comms Test Incident", "severity": "SEV2"},
-        params={"team_id": auth["team_id"]},
+        headers=auth["headers"],
     )
     assert resp.status_code == 201, resp.text
     return resp.json()["id"]
@@ -444,7 +444,7 @@ class TestCrossIncidentIsolation:
         r2 = client.post(
             "/api/incidents",
             json={"title": "Second Incident", "severity": "SEV3"},
-            params={"team_id": auth["team_id"]},
+            headers=auth["headers"],
         )
         assert r2.status_code == 201
         second_id = r2.json()["id"]

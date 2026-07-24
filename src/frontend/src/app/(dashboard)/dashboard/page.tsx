@@ -1,12 +1,56 @@
 "use client";
 
+import { useEffect, useState } from "react";
 import { useUser, useRole } from "@/lib/auth";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
+import { api, AnalyticsSummary, Incident } from "@/lib/api";
+
+function timeAgo(dateStr: string): string {
+  const diff = Date.now() - new Date(dateStr).getTime();
+  const mins = Math.floor(diff / 60000);
+  if (mins < 1) return "just now";
+  if (mins < 60) return `${mins} min ago`;
+  const hours = Math.floor(mins / 60);
+  if (hours < 24) return `${hours}h ago`;
+  const days = Math.floor(hours / 24);
+  return `${days}d ago`;
+}
+
+function formatMTTR(minutes: number): string {
+  if (minutes >= 60) {
+    const h = Math.floor(minutes / 60);
+    const m = Math.round(minutes % 60);
+    return m > 0 ? `${h}h ${m}m` : `${h}h`;
+  }
+  return `${Math.round(minutes)}m`;
+}
+
+const severityVariant: Record<string, "destructive" | "warning" | "info" | "secondary"> = {
+  SEV1: "destructive",
+  SEV2: "warning",
+  SEV3: "info",
+  SEV4: "secondary",
+};
 
 export default function DashboardPage() {
   const user = useUser();
   const role = useRole();
+  const [summary, setSummary] = useState<AnalyticsSummary | null>(null);
+  const [incidents, setIncidents] = useState<Incident[]>([]);
+
+  useEffect(() => {
+    api.get<AnalyticsSummary>("/api/analytics/incidents/summary").then(setSummary);
+    api.get<{ data: Incident[] }>("/api/incidents").then((res) => setIncidents(res.data));
+  }, []);
+
+  const totalIncidents = summary?.total_incidents ?? 0;
+  const sev1Active = summary?.by_severity?.SEV1 ?? 0;
+  const mttr = summary?.mttr_minutes ?? 0;
+  const sla =
+    summary && summary.total_incidents > 0
+      ? Math.round((summary.resolved_incidents / summary.total_incidents) * 100)
+      : 0;
 
   return (
     <div className="space-y-6">
@@ -24,7 +68,7 @@ export default function DashboardPage() {
             <Badge variant="secondary">SEV1-4</Badge>
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">12</div>
+            <div className="text-2xl font-bold">{totalIncidents}</div>
             <p className="text-xs text-muted-foreground">Active incidents</p>
           </CardContent>
         </Card>
@@ -35,7 +79,7 @@ export default function DashboardPage() {
             <Badge variant="destructive">Critical</Badge>
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold text-destructive">2</div>
+            <div className="text-2xl font-bold text-destructive">{sev1Active}</div>
             <p className="text-xs text-muted-foreground">Requires immediate attention</p>
           </CardContent>
         </Card>
@@ -46,7 +90,7 @@ export default function DashboardPage() {
             <Badge variant="info">Avg</Badge>
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">47m</div>
+            <div className="text-2xl font-bold">{formatMTTR(mttr)}</div>
             <p className="text-xs text-muted-foreground">Mean time to resolve</p>
           </CardContent>
         </Card>
@@ -57,7 +101,7 @@ export default function DashboardPage() {
             <Badge variant="success">On Track</Badge>
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">94%</div>
+            <div className="text-2xl font-bold">{sla}%</div>
             <p className="text-xs text-muted-foreground">Within target</p>
           </CardContent>
         </Card>
@@ -69,27 +113,26 @@ export default function DashboardPage() {
         </CardHeader>
         <CardContent>
           <div className="space-y-4">
-            <div className="flex items-center justify-between p-4 border rounded-lg">
-              <div>
-                <p className="font-medium">Database connection pool exhaustion</p>
-                <p className="text-sm text-muted-foreground">api-gateway • 15 min ago</p>
-              </div>
-              <Badge variant="destructive">SEV1</Badge>
-            </div>
-            <div className="flex items-center justify-between p-4 border rounded-lg">
-              <div>
-                <p className="font-medium">High latency on payment service</p>
-                <p className="text-sm text-muted-foreground">payment-service • 1 hour ago</p>
-              </div>
-              <Badge variant="warning">SEV2</Badge>
-            </div>
-            <div className="flex items-center justify-between p-4 border rounded-lg">
-              <div>
-                <p className="font-medium">Log aggregation delayed</p>
-                <p className="text-sm text-muted-foreground">logging • 3 hours ago</p>
-              </div>
-              <Badge variant="info">SEV3</Badge>
-            </div>
+            {incidents.length === 0 ? (
+              <p className="text-sm text-muted-foreground py-4 text-center">No recent incidents.</p>
+            ) : (
+              incidents.slice(0, 3).map((inc) => (
+                <div
+                  key={inc.id}
+                  className="flex items-center justify-between p-4 border rounded-lg"
+                >
+                  <div>
+                    <p className="font-medium">{inc.title}</p>
+                    <p className="text-sm text-muted-foreground">
+                      {inc.assigned_to ?? "unassigned"} &bull; {timeAgo(inc.created_at)}
+                    </p>
+                  </div>
+                  <Badge variant={severityVariant[inc.severity] ?? "secondary"}>
+                    {inc.severity}
+                  </Badge>
+                </div>
+              ))
+            )}
           </div>
         </CardContent>
       </Card>

@@ -34,8 +34,8 @@ export default function IncidentsPage() {
   const [postmortemOpen, setPostmortemOpen] = useState(false);
 
   useEffect(() => {
-    api.get<Incident[]>("/api/incidents")
-      .then(setIncidents)
+    api.get<{ data: Incident[] }>("/api/incidents?per_page=50")
+      .then((res) => setIncidents(res.data))
       .finally(() => setLoading(false));
   }, []);
 
@@ -71,7 +71,7 @@ export default function IncidentsPage() {
   async function downloadPostmortem() {
     if (!selected) return;
     try {
-      const token = localStorage.getItem("sentinel_token");
+      const token = localStorage.getItem("access_token");
       const base = process.env.NEXT_PUBLIC_API_BASE_URL || process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
       const res = await fetch(`${base}/api/ai/postmortem/${selected.id}?format=md`, {
         headers: token ? { Authorization: `Bearer ${token}` } : {},

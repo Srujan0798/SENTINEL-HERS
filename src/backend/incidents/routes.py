@@ -4,8 +4,12 @@ from uuid import UUID
 from fastapi import APIRouter, Depends, HTTPException, Query, status
 from sqlalchemy.orm import Session
 
+from src.backend.auth.dependencies import get_current_user_dependency
+
 from .database import get_db
 from .enums import IncidentStatus, InvalidStateTransition, SeverityLevel
+from pydantic import BaseModel
+
 from .schemas import (
     AssignRequest,
     IncidentCreate,
@@ -17,19 +21,24 @@ from .schemas import (
 )
 from .service import IncidentNotFound, IncidentService
 
+
+class TimelineEventCreate(BaseModel):
+    type: str
+    description: str | None = None
+
 router = APIRouter(prefix="/api/incidents", tags=["incidents"])
 
 
 @router.post("", response_model=IncidentResponse, status_code=status.HTTP_201_CREATED)
 async def create_incident(
     body: IncidentCreate,
-    team_id: UUID = Query(...),
     actor: str = Query("system"),
     db: Session = Depends(get_db),
+    current_user: dict = Depends(get_current_user_dependency),
 ):
     svc = IncidentService(db)
     result = svc.create_incident(
-        team_id=team_id,
+        team_id=current_user["team_id"],
         title=body.title,
         severity=body.severity,
         description=body.description,
@@ -42,17 +51,17 @@ async def create_incident(
 
 @router.get("", response_model=IncidentListResponse)
 async def list_incidents(
-    team_id: UUID = Query(...),
     status_filter: Optional[IncidentStatus] = Query(None, alias="status"),
     severity: Optional[SeverityLevel] = None,
     assigned_to: Optional[UUID] = None,
     page: int = Query(1, ge=1),
     per_page: int = Query(20, ge=1, le=100),
     db: Session = Depends(get_db),
+    current_user: dict = Depends(get_current_user_dependency),
 ):
     svc = IncidentService(db)
     return svc.list_incidents(
-        team_id=team_id,
+        team_id=current_user["team_id"],
         status=status_filter,
         severity=severity,
         assigned_to=assigned_to,
@@ -64,12 +73,12 @@ async def list_incidents(
 @router.get("/{incident_id}", response_model=IncidentResponse)
 async def get_incident(
     incident_id: UUID,
-    team_id: UUID = Query(...),
     db: Session = Depends(get_db),
+    current_user: dict = Depends(get_current_user_dependency),
 ):
     svc = IncidentService(db)
     try:
-        return svc.get_incident(incident_id, team_id)
+        return svc.get_incident(incident_id, current_user["team_id"])
     except IncidentNotFound:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Incident not found")
 
@@ -78,14 +87,14 @@ async def get_incident(
 async def update_incident(
     incident_id: UUID,
     body: IncidentUpdate,
-    team_id: UUID = Query(...),
     actor: str = Query("system"),
     db: Session = Depends(get_db),
+    current_user: dict = Depends(get_current_user_dependency),
 ):
     svc = IncidentService(db)
     updates = body.model_dump(exclude_unset=True)
     try:
-        return svc.update_incident(incident_id, team_id, updates, actor=actor)
+        return svc.update_incident(incident_id, current_user["team_id"], updates, actor=actor)
     except IncidentNotFound:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Incident not found")
     except InvalidStateTransition as exc:
@@ -96,13 +105,13 @@ async def update_incident(
 async def assign_incident(
     incident_id: UUID,
     body: AssignRequest,
-    team_id: UUID = Query(...),
     actor: str = Query("system"),
     db: Session = Depends(get_db),
+    current_user: dict = Depends(get_current_user_dependency),
 ):
     svc = IncidentService(db)
     try:
-        return svc.assign_incident(incident_id, team_id, body.user_id, actor=actor)
+        return svc.assign_incident(incident_id, current_user["team_id"], body.user_id, actor=actor)
     except IncidentNotFound:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Incident not found")
 
@@ -110,12 +119,34 @@ async def assign_incident(
 @router.get("/{incident_id}/timeline", response_model=TimelineListResponse)
 async def get_incident_timeline(
     incident_id: UUID,
-    team_id: UUID = Query(...),
     db: Session = Depends(get_db),
+    current_user: dict = Depends(get_current_user_dependency),
 ):
     svc = IncidentService(db)
     try:
-        events = svc.get_timeline(incident_id, team_id)
+        events = svc.get_timeline(incident_id, current_user["team_id"])
         return {"data": events}
+    except IncidentNotFound:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Incident not found")
+
+
+@router.post("/{incident_id}/timeline", status_code=status.HTTP_201_CREATED)
+async def add_timeline_event(
+    incident_id: UUID,
+    body: TimelineEventCreate,
+    actor: str = Query("system"),
+    db: Session = Depends(get_db),
+    current_user: dict = Depends(get_current_user_dependency),
+):
+    svc = IncidentService(db)
+    try:
+        event = svc.add_timeline_event(
+            incident_id=incident_id,
+            team_id=current_user["team_id"],
+            event_type=body.type,
+            actor=actor,
+            description=body.description,
+        )
+        return event
     except IncidentNotFound:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Incident not found")
