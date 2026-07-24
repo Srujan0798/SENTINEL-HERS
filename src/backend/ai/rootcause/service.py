@@ -69,9 +69,15 @@ JSON only, no other text:"""
 
     # Parse JSON — be lenient
     try:
-        # Strip markdown fences if present
-        raw_clean = re.sub(r"```(?:json)?\n?", "", raw).strip().rstrip("```").strip()
+        # Strip markdown fences and any trailing text
+        raw_clean = raw.strip()
+        if "```" in raw_clean:
+            raw_clean = re.sub(r"^```(?:json)?\s*", "", raw_clean)
+            raw_clean = re.sub(r"```[\s\S]*$", "", raw_clean)
+            raw_clean = raw_clean.strip()
         items = json.loads(raw_clean)
+        if items is None:
+            items = []
         if not isinstance(items, list):
             items = [items]
     except (json.JSONDecodeError, ValueError):
@@ -86,11 +92,25 @@ JSON only, no other text:"""
     results = []
     for item in items[:5]:
         if isinstance(item, dict):
+            hypothesis = item.get("hypothesis")
+            confidence_raw = item.get("confidence")
+            evidence_raw = item.get("supporting_evidence")
+            action_raw = item.get("suggested_action")
+            try:
+                confidence = float(confidence_raw) if confidence_raw is not None else 0.5
+            except (TypeError, ValueError):
+                confidence = 0.5
+            if isinstance(evidence_raw, list):
+                supporting_evidence = [str(e) for e in evidence_raw]
+            elif isinstance(evidence_raw, str):
+                supporting_evidence = [evidence_raw]
+            else:
+                supporting_evidence = []
             results.append(RootCauseSuggestion(
-                hypothesis=str(item.get("hypothesis", "")),
-                confidence=float(item.get("confidence", 0.5)),
-                supporting_evidence=list(item.get("supporting_evidence", [])),
-                suggested_action=str(item.get("suggested_action", "")),
+                hypothesis=str(hypothesis) if hypothesis else "",
+                confidence=confidence,
+                supporting_evidence=supporting_evidence,
+                suggested_action=str(action_raw) if action_raw else "",
             ))
 
     return sorted(results, key=lambda x: x.confidence, reverse=True)

@@ -1,7 +1,7 @@
 """ORM models for incident comms — channels, members, messages."""
 import uuid
 from datetime import datetime
-from sqlalchemy import Column, DateTime, ForeignKey, String, Text, func, JSON
+from sqlalchemy import Boolean, Column, DateTime, ForeignKey, String, Text, func, JSON
 
 from src.backend.db import Base
 
@@ -21,7 +21,7 @@ class Channel(Base):
     )
     name = Column(String(255), nullable=False)
     topic = Column(String(500), nullable=True)
-    is_archived = Column(String(10), nullable=False, default="false")
+    is_archived = Column(Boolean, nullable=False, default=False)
     created_at = Column(DateTime, nullable=False, server_default=func.now())
     updated_at = Column(
         DateTime, nullable=False, server_default=func.now(), onupdate=func.now()

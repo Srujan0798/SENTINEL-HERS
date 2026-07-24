@@ -16,12 +16,10 @@ Brief: [ps.md](ps.md) · Architecture: [plan/ARCHITECTURE.md](plan/ARCHITECTURE.
 | | URL |
 |---|---|
 | **GitHub** | https://github.com/Srujan0798/SENTINEL-HERS |
-| **Live frontend (Vercel)** | _Set after deploy_ → `https://<your-app>.vercel.app` (see [docs/DEPLOYMENT.md](docs/DEPLOYMENT.md)) |
-| **Live backend (Render)** | _Set after deploy_ → `https://<your-service>.onrender.com` |
-| **API health** | `https://<your-service>.onrender.com/healthz` |
-| **OpenAPI** | `https://<your-service>.onrender.com/api/docs` |
-
-> After you deploy, replace the two placeholder rows above with the real HTTPS URLs (submission requirement).
+| **Live frontend (Vercel)** | _Set after deploy_ → `https://sentinel-hers.vercel.app` (see [docs/DEPLOYMENT.md](docs/DEPLOYMENT.md)) |
+| **Live backend (Render)** | `https://sentinel-api-clu9.onrender.com` |
+| **API health** | `https://sentinel-api-clu9.onrender.com/healthz` |
+| **OpenAPI** | `https://sentinel-api-clu9.onrender.com/api/docs` |
 
 ---
 

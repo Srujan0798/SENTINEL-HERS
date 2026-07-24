@@ -17,6 +17,7 @@ from sqlalchemy.orm import sessionmaker
 
 sys.path.insert(0, str(Path(__file__).parent.parent.parent))
 
+from src.backend.auth.dependencies import get_current_user_dependency
 from src.backend.db import Base, get_db
 from src.backend.incidents.models import Incident
 from src.backend.incidents.enums import IncidentStatus, SeverityLevel
@@ -43,6 +44,14 @@ def _override_get_db():
 _ai_app = FastAPI()
 _ai_app.include_router(ai_router)
 _ai_app.dependency_overrides[get_db] = _override_get_db
+_ai_app.dependency_overrides[get_current_user_dependency] = lambda: {
+    "id": "test-user-id",
+    "team_id": TEAM_ID,
+    "role": "admin",
+    "email": "test@sentinel.io",
+    "name": "Test User",
+    "is_active": True,
+}
 _client = TestClient(_ai_app)
 
 TEAM_ID = "00000000-0000-0000-0000-000000000001"

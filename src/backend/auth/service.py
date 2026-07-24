@@ -17,8 +17,17 @@ from .models import (
 )
 from src.backend.shared_models import TeamModel, UserModel
 
-JWT_SECRET = os.getenv("JWT_SECRET", "test-secret-key")
-JWT_REFRESH_SECRET = os.getenv("JWT_REFRESH_SECRET", "test-refresh-secret-key")
+_jwt = os.getenv("JWT_SECRET")
+_jwt_refresh = os.getenv("JWT_REFRESH_SECRET")
+if not _jwt or not _jwt_refresh:
+    if os.getenv("DATABASE_URL"):
+        raise RuntimeError(
+            "JWT_SECRET and JWT_REFRESH_SECRET must be set when DATABASE_URL is configured."
+        )
+    _jwt = "dev-jwt-secret-do-not-use-in-prod"
+    _jwt_refresh = "dev-jwt-refresh-secret-do-not-use-in-prod"
+JWT_SECRET: str = _jwt
+JWT_REFRESH_SECRET: str = _jwt_refresh
 ACCESS_TOKEN_EXPIRE_MINUTES = 15
 REFRESH_TOKEN_EXPIRE_DAYS = 30
 
@@ -124,13 +133,15 @@ def create_team(db: Session, name: str) -> TeamModel:
 def create_user(
     db: Session, email: str, password_hash: str, name: str, team_id: str
 ) -> UserModel:
+    from src.backend.shared_models import RoleModel
+    admin_role = db.query(RoleModel).filter(RoleModel.name == "admin").first()
     user = UserModel(
         id=str(uuid.uuid4()),
         team_id=team_id,
         email=email,
-        hashed_password=password_hash,
+        password_hash=password_hash,
         name=name,
-        role="admin",
+        role_id=str(admin_role.id) if admin_role else None,
         is_active=True,
         created_at=datetime.now(timezone.utc),
     )
@@ -149,12 +160,12 @@ def _user_response(user: UserModel) -> UserResponse:
         team_id=user.team_id,
         email=user.email,
         name=user.name,
-        avatar_url=None,
-        role_id=user.role,
+        avatar_url=user.avatar_url,
+        role_id=str(user.role_id) if user.role_id else None,
         is_active=user.is_active,
         last_login_at=getattr(user, "last_login_at", None),
         created_at=user.created_at,
-        updated_at=user.created_at,
+        updated_at=getattr(user, "updated_at", user.created_at),
     )
 
 
@@ -180,7 +191,7 @@ def register(request: RegisterRequest, db: Session) -> TokenResponse:
 
 def login(request: LoginRequest, db: Session) -> TokenResponse:
     user = get_user_by_email(db, request.email)
-    if not user or not verify_password(request.password, user.hashed_password):
+    if not user or not verify_password(request.password, user.password_hash):
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Invalid email or password",
@@ -241,7 +252,7 @@ def get_current_user(token: str, db: Session) -> dict:
         # cast UUID → str so downstream inserts/queries bind cleanly on SQLite
         "id": str(user.id),
         "team_id": str(user.team_id) if user.team_id else None,
-        "role": user.role,
+        "role": user.role_id,
         "email": user.email,
         "name": user.name,
         "is_active": user.is_active,

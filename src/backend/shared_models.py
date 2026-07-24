@@ -5,7 +5,7 @@ building the SQLite test DB. Production uses the raw SQL migration in
 schema/migrations/001_initial_schema.sql.
 """
 import uuid
-from sqlalchemy import Column, String, Boolean, DateTime, ForeignKey
+from sqlalchemy import Column, String, Boolean, DateTime, ForeignKey, JSON
 from sqlalchemy.types import TypeDecorator
 
 from src.backend.db import Base
@@ -30,6 +30,18 @@ class TeamModel(Base):
     id = Column(_UuidStr, primary_key=True, default=lambda: str(uuid.uuid4()))
     name = Column(String(255), nullable=False)
     slug = Column(String(255), nullable=False, unique=True)
+    description = Column(String(500), nullable=True)
+    settings = Column(JSON, default=dict)
+    created_at = Column(DateTime(timezone=True), nullable=True)
+    updated_at = Column(DateTime(timezone=True), nullable=True)
+
+
+class RoleModel(Base):
+    __tablename__ = "roles"
+    id = Column(_UuidStr, primary_key=True, default=lambda: str(uuid.uuid4()))
+    name = Column(String(100), nullable=False, unique=True)
+    permissions = Column(JSON, nullable=False, default=list)
+    description = Column(String(255), nullable=True)
     created_at = Column(DateTime(timezone=True), nullable=True)
 
 
@@ -38,11 +50,13 @@ class UserModel(Base):
     id = Column(_UuidStr, primary_key=True, default=lambda: str(uuid.uuid4()))
     team_id = Column(_UuidStr, ForeignKey("teams.id", ondelete="CASCADE"), nullable=True)
     email = Column(String(255), nullable=False, unique=True)
-    hashed_password = Column(String(255), nullable=False, default="")
+    password_hash = Column(String(255), nullable=False, default="")
     name = Column(String(255), nullable=False, default="")
-    role = Column(String(50), nullable=False, default="VIEWER")
+    avatar_url = Column(String(500), nullable=True)
+    role_id = Column(_UuidStr, ForeignKey("roles.id", ondelete="SET NULL"), nullable=True)
     is_active = Column(Boolean, nullable=False, default=True)
-    created_at = Column(DateTime(timezone=True), nullable=True)
     last_login_at = Column(DateTime(timezone=True), nullable=True)
+    created_at = Column(DateTime(timezone=True), nullable=True)
+    updated_at = Column(DateTime(timezone=True), nullable=True)
 
 

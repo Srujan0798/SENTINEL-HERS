@@ -1,4 +1,6 @@
 import asyncio
+import logging
+import os
 import aiohttp
 from datetime import datetime, timedelta
 from sqlalchemy import create_engine, text
@@ -8,13 +10,15 @@ import json
 
 from src.backend.health.models import ServiceHealth
 
+logger = logging.getLogger(__name__)
+
 
 class ServiceHealthProbe:
     def __init__(self):
-        self.database_url = "postgresql://postgres:postgres@localhost:5432/sentinel"
-        self.engine = create_engine(self.database_url)
+        self.database_url = os.getenv("DATABASE_URL", "postgresql://postgres:postgres@localhost:5432/sentinel")
+        self.engine = create_engine(self.database_url, pool_pre_ping=True)
         self.SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=self.engine)
-        self.realtime_hub_url = "http://localhost:8000/realtime/hub"
+        self.realtime_hub_url = os.getenv("REALTIME_HUB_URL", "http://localhost:8000/realtime/hub")
 
     async def check_service(self, service_name: str, team_id: str) -> Dict[str, Any]:
         """Check a single service and return health metrics"""
@@ -56,13 +60,6 @@ class ServiceHealthProbe:
         """Update service health in database and emit realtime event if status changed"""
         db = self.SessionLocal()
         try:
-            db.execute(text("""
-                SELECT status, latency_ms, uptime_percentage
-                FROM service_health
-                WHERE service_name = :service_name AND team_id = :team_id
-            """), {"service_name": service_name, "team_id": team_id})
-            
-            previous_status = None
             row = db.execute(text("""
                 SELECT status, latency_ms, uptime_percentage
                 FROM service_health
@@ -105,9 +102,9 @@ class ServiceHealthProbe:
                 })
             
             db.commit()
-        except Exception as e:
+        except Exception:
             db.rollback()
-            raise e
+            raise
         finally:
             db.close()
 
@@ -126,11 +123,11 @@ class ServiceHealthProbe:
             import requests
             response = requests.post(self.realtime_hub_url, json=event_data, timeout=5)
             if response.status_code == 200:
-                print(f"Emitted health change event: {service_name} {previous_status} -> {new_status}")
+                logger.info("Emitted health change event: %s %s -> %s", service_name, previous_status, new_status)
             else:
-                print(f"Failed to emit health change event: {response.status_code}")
+                logger.warning("Failed to emit health change event: %s", response.status_code)
         except Exception as e:
-            print(f"Error emitting health change event: {e}")
+            logger.error("Error emitting health change event: %s", e)
 
     async def probe_all_services(self):
         """Probe all registered services"""
@@ -161,7 +158,7 @@ class ServiceHealthProbe:
                 await self.probe_all_services()
                 await asyncio.sleep(interval_seconds)
             except Exception as e:
-                print(f"Error in service probing: {e}")
+                logger.error("Error in service probing: %s", e)
                 await asyncio.sleep(interval_seconds)
 
 

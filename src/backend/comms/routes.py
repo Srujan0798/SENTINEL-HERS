@@ -37,7 +37,10 @@ async def get_channel(
     svc = CommsService(db)
     # Touch the incident first so we can surface a clean 404.
     from src.backend.incidents.models import Incident
-    inc = db.query(Incident).filter(Incident.id == str(incident_id)).first()
+    inc = db.query(Incident).filter(
+        Incident.id == str(incident_id),
+        Incident.team_id == team_id,
+    ).first()
     if not inc:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Incident not found")
     try:

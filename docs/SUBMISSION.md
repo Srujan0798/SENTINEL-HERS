@@ -13,8 +13,8 @@
 | Full Name | Choda Srujan Sai |
 | Roll Number | 23110081 |
 | Problem statement | **Sentinel — AI Native Engineering Operations Platform (Hard)** |
-| GitHub Repository Link | `https://github.com/<your-username>/sentinel` *(fill after push)* |
-| Live Deployment Link (optional) | *(optional — leave blank or add Render/Railway URL)* |
+| GitHub Repository Link | `https://github.com/Srujan0798/SENTINEL-HERS` |
+| Live Deployment Link (optional) | `https://sentinel-api-clu9.onrender.com` |
 | Demo Video Link (optional) | *(optional — record 2-min Loom walking the demo path)* |
 
 ---
@@ -137,10 +137,11 @@ Pointers on a free/low-cost hosting path for a multi-service Docker Compose app
 
 ## Pre-submission checklist
 
-- [ ] `git init` + initial commit (done locally — see below)
-- [ ] Create GitHub repo and push (`git remote add origin … && git push -u origin main`)
-- [ ] Confirm `.env` is NOT in the repo (it is gitignored)
-- [ ] Paste GitHub link into the form
-- [ ] (Optional) Deploy + add live link
+- [x] `git init` + initial commit
+- [x] Create GitHub repo and push (`git remote add origin … && git push -u origin main`)
+- [x] Confirm `.env` is NOT in the repo (it is gitignored)
+- [x] Paste GitHub link into the form
+- [x] Deploy backend to Render ✅ (`https://sentinel-api-clu9.onrender.com`)
+- [ ] Deploy frontend to Vercel
 - [ ] (Optional) Record 2-min demo video of the demo path in `HOW_TO_RUN.md`
 - [ ] Submit form

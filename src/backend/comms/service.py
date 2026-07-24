@@ -59,7 +59,7 @@ class CommsService:
             incident_id=str(incident_id),
             name=f"#{incident_title[:80]}",
             topic=f"Incident {incident_id} — realtime coordination",
-            is_archived="false",
+            is_archived=False,
         )
         self.db.add(channel)
         try:
@@ -119,7 +119,12 @@ class CommsService:
             .all()
         )
         return [
-            {"id": str(u.id), "name": u.name or "", "email": u.email or "", "role": u.role}
+            {
+                "id": str(u.id),
+                "name": u.name or "",
+                "email": u.email or "",
+                "role": str(u.role_id) if u.role_id else "viewer",
+            }
             for u in rows
         ]
 
@@ -391,7 +396,7 @@ class CommsService:
             "incident_id": str(ch.incident_id),
             "name": ch.name,
             "topic": ch.topic,
-            "is_archived": ch.is_archived == "true",
+            "is_archived": bool(ch.is_archived),
             "created_at": ch.created_at.isoformat() if ch.created_at else None,
             "updated_at": ch.updated_at.isoformat() if ch.updated_at else None,
             "member_count": int(members),

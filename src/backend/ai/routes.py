@@ -31,8 +31,11 @@ class RootCauseListResponse(BaseModel):
     root_causes: list[RootCauseResponse]
 
 
-def _get_incident_or_404(db: Session, incident_id: str) -> Incident:
-    inc = db.query(Incident).filter(Incident.id == incident_id).first()
+def _get_incident_or_404(db: Session, incident_id: str, team_id: str | None = None) -> Incident:
+    q = db.query(Incident).filter(Incident.id == incident_id)
+    if team_id:
+        q = q.filter(Incident.team_id == team_id)
+    inc = q.first()
     if not inc:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
@@ -103,9 +106,10 @@ def _serialize_incident(inc: Incident) -> dict[str, Any]:
 async def get_incident_summary(
     incident_id: str,
     db: Session = Depends(get_db),
+    current_user: dict = Depends(get_current_user_dependency),
 ):
     """Return cached summary or generate a new one via AI."""
-    inc = _get_incident_or_404(db, incident_id)
+    inc = _get_incident_or_404(db, incident_id, team_id=current_user["team_id"])
 
     # If already cached on the incident, return it
     if inc.ai_summary:
@@ -140,26 +144,31 @@ async def get_incident_summary(
 async def get_incident_root_causes(
     incident_id: str,
     db: Session = Depends(get_db),
+    current_user: dict = Depends(get_current_user_dependency),
 ):
     """Trigger root-cause analysis and return ranked hypotheses."""
-    inc = _get_incident_or_404(db, incident_id)
+    inc = _get_incident_or_404(db, incident_id, team_id=current_user["team_id"])
 
     logs = _fetch_logs(db, incident_id)
 
     # Fetch recent deployments for this team (best-effort)
     deployments: list[dict[str, Any]] = []
     try:
-        from src.backend.logs.models import LogEntryModel as _LEM
+        from src.backend.integrations.github.models import Deployment
 
-        services = {
-            r[0]
-            for r in db.query(_LEM.service)
-            .filter(_LEM.incident_id == incident_id)
-            .distinct()
+        deploy_rows = (
+            db.query(Deployment)
+            .filter(Deployment.team_id == current_user["team_id"])
+            .order_by(Deployment.deployed_at.desc())
+            .limit(10)
             .all()
-        }
+        )
+        deployments = [
+            {"service": d.service, "version": d.version, "deployed_at": d.deployed_at.isoformat() if d.deployed_at else None}
+            for d in deploy_rows
+        ]
     except Exception:
-        services = set()
+        pass
 
     incident_dict = _serialize_incident(inc)
 
