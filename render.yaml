@@ -60,11 +60,16 @@ services:
         generateValue: true
 
       # AI layer — set in the dashboard (sync: false = dashboard-only secret).
+      # Supports: claude, gemini, openrouter, nvidia. Default: mock (no key needed).
       - key: AI_PROVIDER
-        value: claude
+        value: openrouter
       - key: ANTHROPIC_API_KEY
         sync: false
       - key: GEMINI_API_KEY
+        sync: false
+      - key: OPENROUTER_API_KEY
+        sync: false
+      - key: NVAPI_KEY
         sync: false
 
       # Integrations — dashboard-only secrets (optional).
