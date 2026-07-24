@@ -16,7 +16,7 @@ Brief: [ps.md](ps.md) · Architecture: [plan/ARCHITECTURE.md](plan/ARCHITECTURE.
 | | URL |
 |---|---|
 | **GitHub** | https://github.com/Srujan0798/SENTINEL-HERS |
-| **Live frontend (Vercel)** | `https://sentinel-hers-git-main-srujan-sais-projects.vercel.app` (custom domain `sentinel-hers.vercel.app` — set via Vercel dashboard → Settings → Domains) |
+| **Live frontend (Vercel)** | `https://sentinel-hers.vercel.app` |
 | **Live backend (Render)** | `https://sentinel-api-clu9.onrender.com` |
 | **API health** | `https://sentinel-api-clu9.onrender.com/healthz` |
 | **OpenAPI** | `https://sentinel-api-clu9.onrender.com/api/docs` |
@@ -163,7 +163,7 @@ WRITEUP.md        1–2 page technical write-up (submission required)
 - [x] `WRITEUP.md` (technical decisions, challenges, more time)  
 - [x] Green automated tests (183)  
 - [x] Deploy configs (`render.yaml`, `src/frontend/vercel.json`)  
-- [x] Live deployment URLs embedded above (preview — set Vercel custom domain at https://vercel.com/srujan0798/sentinel-hers/settings/domains)  
+- [x] Live deployment URLs embedded above  
 - [ ] Optional: wave-10 brownie harden via OpenCode agents (`work/OPENCODE_DISPATCH.md`)
 
 Mid-term form drafts: [docs/SUBMISSION.md](docs/SUBMISSION.md).

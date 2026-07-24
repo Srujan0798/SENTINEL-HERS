@@ -14,7 +14,7 @@
 | Roll Number | 23110081 |
 | Problem statement | **Sentinel — AI Native Engineering Operations Platform (Hard)** |
 | GitHub Repository Link | `https://github.com/Srujan0798/SENTINEL-HERS` |
-| Live Deployment Link (optional) | Frontend: `https://sentinel-hers-git-main-srujan-sais-projects.vercel.app` · Backend: `https://sentinel-api-clu9.onrender.com` |
+| Live Deployment Link (optional) | Frontend: `https://sentinel-hers.vercel.app` · Backend: `https://sentinel-api-clu9.onrender.com` |
 | Demo Video Link (optional) | *(optional — record 2-min Loom walking the demo path)* |
 
 ---
@@ -142,6 +142,6 @@ Pointers on a free/low-cost hosting path for a multi-service Docker Compose app
 - [x] Confirm `.env` is NOT in the repo (it is gitignored)
 - [x] Paste GitHub link into the form
 - [x] Deploy backend to Render ✅ (`https://sentinel-api-clu9.onrender.com`)
-- [x] Deploy frontend to Vercel (preview at `https://sentinel-hers-git-main-srujan-sais-projects.vercel.app` — set custom domain at Vercel dashboard)
+- [x] Deploy frontend to Vercel (`https://sentinel-hers.vercel.app`)
 - [ ] (Optional) Record 2-min demo video of the demo path in `HOW_TO_RUN.md`
 - [ ] Submit form
