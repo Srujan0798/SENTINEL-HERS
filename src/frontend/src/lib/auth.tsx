@@ -166,7 +166,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     };
 
     void initAuth();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   const fetchUser = async (token: string) => {

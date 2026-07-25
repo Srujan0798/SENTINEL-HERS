@@ -1,26 +1,234 @@
 @import "tailwindcss";
 
+/* ═══════════════════════════════════════════════════════════
+   SENTINEL — Radar Ops Console (see /DESIGN.md)
+   ═══════════════════════════════════════════════════════════ */
+
 :root {
-  --background: #ffffff;
-  --foreground: #171717;
+  /* Brand palette */
+  --void: #070b14;
+  --panel: #0f1629;
+  --panel-elevated: #162038;
+  --line: #243049;
+  --ink: #e8eef9;
+  --ink-muted: #8b9bb8;
+  --phosphor: #e8a838;
+  --ice: #6ec6ff;
+  --sev1: #ff3b5c;
+  --ok: #3ddc97;
+  --warn: #f5c542;
+
+  /* shadcn semantic map */
+  --background: var(--void);
+  --foreground: var(--ink);
+  --card: var(--panel);
+  --card-foreground: var(--ink);
+  --popover: var(--panel-elevated);
+  --popover-foreground: var(--ink);
+  --primary: var(--phosphor);
+  --primary-foreground: #0b0f1a;
+  --secondary: var(--panel-elevated);
+  --secondary-foreground: var(--ink);
+  --muted: #121a2e;
+  --muted-foreground: var(--ink-muted);
+  --accent: var(--panel-elevated);
+  --accent-foreground: var(--ink);
+  --destructive: var(--sev1);
+  --destructive-foreground: #fff5f7;
+  --border: var(--line);
+  --input: var(--line);
+  --ring: var(--ice);
+
+  --radius: 0.5rem;
+  --radius-card: 0.625rem;
+
+  /* Spacing scale (4px base) — use as CSS vars where needed */
+  --space-1: 0.25rem;
+  --space-2: 0.5rem;
+  --space-3: 0.75rem;
+  --space-4: 1rem;
+  --space-6: 1.5rem;
+  --space-8: 2rem;
 }
 
 @theme inline {
   --color-background: var(--background);
   --color-foreground: var(--foreground);
-  --font-sans: var(--font-geist-sans);
-  --font-mono: var(--font-geist-mono);
+  --color-card: var(--card);
+  --color-card-foreground: var(--card-foreground);
+  --color-popover: var(--popover);
+  --color-popover-foreground: var(--popover-foreground);
+  --color-primary: var(--primary);
+  --color-primary-foreground: var(--primary-foreground);
+  --color-secondary: var(--secondary);
+  --color-secondary-foreground: var(--secondary-foreground);
+  --color-muted: var(--muted);
+  --color-muted-foreground: var(--muted-foreground);
+  --color-accent: var(--accent);
+  --color-accent-foreground: var(--accent-foreground);
+  --color-destructive: var(--destructive);
+  --color-destructive-foreground: var(--destructive-foreground);
+  --color-border: var(--border);
+  --color-input: var(--input);
+  --color-ring: var(--ring);
+  --color-phosphor: var(--phosphor);
+  --color-ice: var(--ice);
+  --color-sev1: var(--sev1);
+  --color-ok: var(--ok);
+  --color-warn: var(--warn);
+  /* Eternal stacks — no runtime Google Fonts dependency */
+  --font-sans: "Avenir Next", "Segoe UI", "Helvetica Neue", ui-sans-serif, system-ui, sans-serif;
+  --font-mono: "IBM Plex Mono", "SF Mono", "Cascadia Code", "Consolas", ui-monospace, monospace;
+  --radius-sm: calc(var(--radius) - 2px);
+  --radius-md: var(--radius);
+  --radius-lg: var(--radius-card);
 }
 
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
-  }
+:root {
+  --font-outfit: var(--font-sans);
+  --font-plex-mono: var(--font-mono);
+}
+
+/* Force dark ops console — no light-mode flip for product identity */
+html {
+  color-scheme: dark;
 }
 
 body {
-  background: var(--background);
+  background-color: var(--background);
   color: var(--foreground);
-  font-family: Arial, Helvetica, sans-serif;
+  font-family: var(--font-outfit), ui-sans-serif, system-ui, sans-serif;
+  min-height: 100%;
+  /* Subtle radar grid — signature atmosphere */
+  background-image:
+    radial-gradient(ellipse 80% 50% at 50% -20%, rgba(232, 168, 56, 0.08), transparent 55%),
+    linear-gradient(rgba(36, 48, 73, 0.35) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(36, 48, 73, 0.35) 1px, transparent 1px);
+  background-size: 100% 100%, 48px 48px, 48px 48px;
+  background-attachment: fixed;
+}
+
+/* Typography utilities */
+.font-display {
+  font-family: var(--font-outfit), ui-sans-serif, system-ui, sans-serif;
+  letter-spacing: -0.02em;
+}
+
+.font-data {
+  font-family: var(--font-plex-mono), ui-monospace, monospace;
+  font-variant-numeric: tabular-nums;
+}
+
+.label-caps {
+  font-size: 0.6875rem;
+  font-weight: 600;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--ink-muted);
+}
+
+/* Ops surfaces */
+.ops-card {
+  border: 1px solid var(--line);
+  background: color-mix(in srgb, var(--panel) 92%, transparent);
+  backdrop-filter: blur(8px);
+  border-radius: var(--radius-card);
+  box-shadow: 0 0 0 1px rgba(110, 198, 255, 0.03);
+}
+
+.ops-card:hover {
+  border-color: color-mix(in srgb, var(--phosphor) 35%, var(--line));
+}
+
+/* Severity pulse — SEV1 open only; respect reduced motion */
+@keyframes sev1-pulse {
+  0%,
+  100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.72;
+  }
+}
+
+.sev1-live {
+  animation: sev1-pulse 2.2s ease-in-out infinite;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .sev1-live {
+    animation: none;
+  }
+}
+
+/* Focus accessibility floor */
+:focus-visible {
+  outline: 2px solid var(--ice);
+  outline-offset: 2px;
+}
+
+/* Scrollbars — dense console */
+* {
+  scrollbar-width: thin;
+  scrollbar-color: var(--line) transparent;
+}
+
+/* Utility aliases used across pages */
+.bg-background {
+  background-color: var(--background);
+}
+.text-foreground {
+  color: var(--foreground);
+}
+.bg-card {
+  background-color: var(--card);
+}
+.text-card-foreground {
+  color: var(--card-foreground);
+}
+.bg-primary {
+  background-color: var(--primary);
+}
+.text-primary {
+  color: var(--primary);
+}
+.text-primary-foreground {
+  color: var(--primary-foreground);
+}
+.bg-secondary {
+  background-color: var(--secondary);
+}
+.text-secondary-foreground {
+  color: var(--secondary-foreground);
+}
+.bg-muted {
+  background-color: var(--muted);
+}
+.text-muted-foreground {
+  color: var(--muted-foreground);
+}
+.bg-accent {
+  background-color: var(--accent);
+}
+.text-accent-foreground {
+  color: var(--accent-foreground);
+}
+.bg-destructive {
+  background-color: var(--destructive);
+}
+.text-destructive {
+  color: var(--destructive);
+}
+.text-destructive-foreground {
+  color: var(--destructive-foreground);
+}
+.border-border,
+.border-input {
+  border-color: var(--border);
+}
+.ring-ring {
+  --tw-ring-color: var(--ring);
+}
+.border-destructive {
+  border-color: var(--destructive);
 }

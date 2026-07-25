@@ -1,21 +1,11 @@
 import type { Metadata } from "next";
-import { Geist, Geist_Mono } from "next/font/google";
 import { AuthProvider } from "@/lib/auth";
 import "./globals.css";
 
-const geistSans = Geist({
-  variable: "--font-geist-sans",
-  subsets: ["latin"],
-});
-
-const geistMono = Geist_Mono({
-  variable: "--font-geist-mono",
-  subsets: ["latin"],
-});
-
 export const metadata: Metadata = {
-  title: "SENTINEL — AI-Native Engineering Operations Platform",
-  description: "Unified incident management, log monitoring, and AI-assisted debugging",
+  title: "SENTINEL — AI-Native Engineering Operations",
+  description:
+    "Mission console for production incidents: logs, deploys, AI diagnosis, tasks, and team chat in one war room.",
 };
 
 export default function RootLayout({
@@ -24,8 +14,8 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <html lang="en" className={`${geistSans.variable} ${geistMono.variable} h-full antialiased`}>
-      <body className="min-h-full flex flex-col">
+    <html lang="en" className="h-full dark">
+      <body className="min-h-full flex flex-col antialiased">
         <AuthProvider>{children}</AuthProvider>
       </body>
     </html>

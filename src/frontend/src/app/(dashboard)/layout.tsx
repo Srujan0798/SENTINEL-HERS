@@ -8,12 +8,12 @@ import { useAuth, useRole } from "@/lib/auth";
 import { StatusBar } from "@/components/realtime/StatusBar";
 
 const navigation = [
-  { name: "Dashboard", href: "/dashboard", roles: ["admin", "incident_commander", "responder", "viewer"] },
-  { name: "Incidents", href: "/incidents", roles: ["admin", "incident_commander", "responder", "viewer"] },
-  { name: "Monitoring", href: "/monitoring", roles: ["admin", "incident_commander", "responder", "viewer"] },
-  { name: "Deployments", href: "/deployments", roles: ["admin", "incident_commander", "responder", "viewer"] },
-  { name: "Analytics", href: "/analytics", roles: ["admin", "incident_commander", "responder", "viewer"] },
-  { name: "Settings", href: "/settings", roles: ["admin", "incident_commander", "responder", "viewer"] },
+  { name: "Dashboard", href: "/dashboard" },
+  { name: "Incidents", href: "/incidents" },
+  { name: "Monitoring", href: "/monitoring" },
+  { name: "Deployments", href: "/deployments" },
+  { name: "Analytics", href: "/analytics" },
+  { name: "Settings", href: "/settings" },
 ];
 
 export default function DashboardLayout({ children }: { children: ReactNode }) {
@@ -27,9 +27,7 @@ export default function DashboardLayout({ children }: { children: ReactNode }) {
     setMounted(true);
   }, []);
 
-  // Never hide the entire product because role hydration lagged — that looked like a broken login.
-  const effectiveRole = role || "admin";
-  const filteredNav = navigation.filter((item) => item.roles.includes(effectiveRole));
+  const effectiveRole = role || "operator";
 
   const handleLogout = async () => {
     await logout();
@@ -38,51 +36,55 @@ export default function DashboardLayout({ children }: { children: ReactNode }) {
 
   if (!mounted) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-background text-muted-foreground">
-        Loading SENTINEL…
+      <div className="min-h-screen flex items-center justify-center text-[color:var(--ink-muted)] font-data text-sm">
+        Loading console…
       </div>
     );
   }
 
   if (!state.isLoading && !state.isAuthenticated && !state.accessToken) {
-    // Client-side fallback if middleware cookie was lost but user hit a protected shell.
-    if (typeof window !== "undefined") {
-      router.replace("/login");
-    }
+    if (typeof window !== "undefined") router.replace("/login");
   }
 
   return (
-    <div className="min-h-screen bg-background">
-      <header className="border-b bg-card sticky top-0 z-50">
-        <div className="container flex h-14 sm:h-16 items-center justify-between px-3 sm:px-4 gap-2">
-          <Link href="/dashboard" className="text-lg sm:text-xl font-bold text-primary shrink-0">
-            SENTINEL
+    <div className="min-h-screen">
+      <header className="border-b border-[color:var(--line)] bg-[color:var(--panel)]/90 backdrop-blur-md sticky top-0 z-50">
+        <div className="container flex h-14 sm:h-16 items-center justify-between px-3 sm:px-4 gap-2 max-w-7xl mx-auto">
+          <Link href="/dashboard" className="flex items-center gap-2 shrink-0 group">
+            <span className="h-2 w-2 rounded-full bg-[color:var(--phosphor)] group-hover:shadow-[0_0_12px_var(--phosphor)] transition-shadow" />
+            <span className="text-base sm:text-lg font-display font-semibold tracking-tight text-[color:var(--ink)]">
+              SENTINEL
+            </span>
           </Link>
 
-          <nav className="flex items-center gap-2 sm:gap-4 min-w-0 flex-1 justify-end">
-            <ul className="flex items-center gap-1 sm:gap-3 overflow-x-auto max-w-[55vw] sm:max-w-none py-1">
-              {filteredNav.map((item) => (
-                <li key={item.name} className="shrink-0">
-                  <Link
-                    href={item.href}
-                    className={`text-xs sm:text-sm font-medium whitespace-nowrap px-1.5 py-1 rounded transition-colors ${
-                      pathname === item.href || pathname.startsWith(item.href + "/")
-                        ? "text-primary bg-primary/10"
-                        : "text-muted-foreground hover:text-foreground"
-                    }`}
-                  >
-                    {item.name}
-                  </Link>
-                </li>
-              ))}
+          <nav className="flex items-center gap-2 sm:gap-3 min-w-0 flex-1 justify-end">
+            <ul className="flex items-center gap-0.5 sm:gap-1 overflow-x-auto max-w-[58vw] sm:max-w-none py-1">
+              {navigation.map((item) => {
+                const active = pathname === item.href || pathname.startsWith(item.href + "/");
+                return (
+                  <li key={item.name} className="shrink-0">
+                    <Link
+                      href={item.href}
+                      className={`text-xs sm:text-sm font-medium whitespace-nowrap px-2.5 py-1.5 rounded-md transition-colors ${
+                        active
+                          ? "text-[color:var(--primary-foreground)] bg-[color:var(--phosphor)]"
+                          : "text-[color:var(--ink-muted)] hover:text-[color:var(--ink)] hover:bg-[color:var(--panel-elevated)]"
+                      }`}
+                    >
+                      {item.name}
+                    </Link>
+                  </li>
+                );
+              })}
             </ul>
 
-            <div className="flex items-center gap-2 sm:gap-3 shrink-0 border-l pl-2 sm:pl-3">
+            <div className="flex items-center gap-2 sm:gap-3 shrink-0 border-l border-[color:var(--line)] pl-2 sm:pl-3">
               <StatusBar teamId={state.user?.team_id} />
-              <span className="text-xs text-muted-foreground hidden md:block max-w-[10rem] truncate">
-                {state.user?.name || "Operator"} · {effectiveRole}
+              <span className="text-[10px] sm:text-xs font-data text-[color:var(--ink-muted)] hidden md:block max-w-[11rem] truncate">
+                {state.user?.name || "Operator"}
+                <span className="text-[color:var(--phosphor)]"> · {effectiveRole}</span>
               </span>
-              <Button variant="ghost" size="sm" onClick={() => void handleLogout()}>
+              <Button variant="ghost" size="sm" className="text-xs" onClick={() => void handleLogout()}>
                 Log out
               </Button>
             </div>
@@ -90,7 +92,7 @@ export default function DashboardLayout({ children }: { children: ReactNode }) {
         </div>
       </header>
 
-      <main className="container py-4 sm:py-6 px-3 sm:px-4">{children}</main>
+      <main className="container max-w-7xl mx-auto py-4 sm:py-6 px-3 sm:px-4">{children}</main>
     </div>
   );
 }
