@@ -143,9 +143,11 @@ async def add_timeline_event(
         event = svc.add_timeline_event(
             incident_id=incident_id,
             team_id=current_user["team_id"],
-            event_type=body.type,
+            event_type=body.event_type,
+            source=body.source,
             actor=actor,
             description=body.description,
+            metadata=body.metadata,
         )
         return event
     except IncidentNotFound:

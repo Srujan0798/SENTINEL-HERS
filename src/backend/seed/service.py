@@ -379,24 +379,70 @@ def ensure_demo_seed(db: Session) -> dict[str, Any]:
             )
             db.add(repair)
             existing_count += 1
-        sev1_n = (
+        open_statuses = (
+            IncidentStatus.DETECTED.value,
+            IncidentStatus.TRIAGING.value,
+            IncidentStatus.INVESTIGATING.value,
+            IncidentStatus.MITIGATING.value,
+        )
+        open_sev1_n = (
             db.query(Incident)
-            .filter(Incident.team_id == team_id, Incident.severity == SeverityLevel.SEV1.value)
+            .filter(
+                Incident.team_id == team_id,
+                Incident.severity == SeverityLevel.SEV1.value,
+                Incident.status.in_(open_statuses),
+            )
             .count()
         )
-        if sev1_n == 0:
-            db.add(
-                Incident(
-                    id=str(uuid.uuid4()),
-                    team_id=team_id,
-                    title="Payment service cascade failure",
-                    description="SEV1 cascade failure (seed repair).",
-                    severity=SeverityLevel.SEV1.value,
-                    status=IncidentStatus.INVESTIGATING.value,
-                    detected_at=now - timedelta(minutes=45),
-                    assigned_to=str(user.id),
-                )
+        # Judge path requires an *open* SEV1. Counting any SEV1 (including resolved)
+        # left demo-status green while the war room had nothing to open.
+        if open_sev1_n == 0:
+            sev1 = Incident(
+                id=str(uuid.uuid4()),
+                team_id=team_id,
+                title="Payment service cascade failure",
+                description=(
+                    "Payment service is returning 503s due to database connection pool "
+                    "exhaustion. Error rate at 78%, p99 latency > 5s. (seed repair open SEV1)"
+                ),
+                severity=SeverityLevel.SEV1.value,
+                status=IncidentStatus.INVESTIGATING.value,
+                detected_at=now - timedelta(minutes=45),
+                assigned_to=str(user.id),
             )
+            db.add(sev1)
+            db.flush()
+            for mins, ev_type, ev_desc in [
+                (0, "detection", "PagerDuty alert fired: payment error rate > 50%"),
+                (8, "acknowledgement", "On-call engineer paged and acknowledged"),
+                (18, "investigation", "Root cause narrowed to DB connection pool exhaustion"),
+            ]:
+                db.add(
+                    TimelineEvent(
+                        id=str(uuid.uuid4()),
+                        incident_id=sev1.id,
+                        event_type=ev_type,
+                        source="seed",
+                        actor="system",
+                        description=ev_desc,
+                        ts=now - timedelta(minutes=45 - mins),
+                    )
+                )
+            for task_title, task_priority in [
+                ("Increase DB connection pool size in prod", "high"),
+                ("Add circuit breaker to payments to DB calls", "high"),
+            ]:
+                db.add(
+                    Task(
+                        id=str(uuid.uuid4()),
+                        team_id=team_id,
+                        incident_id=sev1.id,
+                        title=task_title,
+                        priority=task_priority,
+                        status="open",
+                        created_by=str(user.id),
+                    )
+                )
             existing_count += 1
         dep_n = _ensure_deployments_and_commits(db, team_id, now)
         health_n = _ensure_service_health(db, team_id, now)
@@ -409,6 +455,7 @@ def ensure_demo_seed(db: Session) -> dict[str, Any]:
             "incident_count": existing_count,
             "deployment_count": dep_n,
             "service_health_count": health_n,
+            "open_sev1": open_sev1_n if open_sev1_n > 0 else 1,
             "demo_email": DEMO_EMAIL,
         }
 

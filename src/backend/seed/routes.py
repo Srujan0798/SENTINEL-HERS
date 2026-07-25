@@ -34,6 +34,17 @@ async def demo_status(db: Session = Depends(get_db)):
         if team_id
         else 0
     )
+    open_sev1 = (
+        db.query(Incident)
+        .filter(
+            Incident.team_id == team_id,
+            Incident.severity == "SEV1",
+            Incident.status.in_(("detected", "triaging", "investigating", "mitigating")),
+        )
+        .count()
+        if team_id
+        else 0
+    )
     resolved = (
         db.query(Incident)
         .filter(Incident.team_id == team_id, Incident.resolved_at.isnot(None))
@@ -41,15 +52,22 @@ async def demo_status(db: Session = Depends(get_db)):
         if team_id
         else 0
     )
-    ready = bool(user and incidents >= 1 and sev1 >= 1)
+    # Ready only when an *open* SEV1 exists for the sacred war-room demo path.
+    ready = bool(user and incidents >= 1 and open_sev1 >= 1)
     return {
         "ready": ready,
         "demo_email": DEMO_EMAIL,
         "incident_count": incidents,
         "sev1_count": sev1,
+        "open_sev1_count": open_sev1,
         "resolved_count": resolved,
         "frontend": "https://sentinel-hers.vercel.app",
         "login_hint": "demo@sentinel.io / Sentinel2026!",
+        **(
+            {}
+            if ready
+            else {"reason": "no open SEV1 — run AUTO_SEED_DEMO repair or POST /api/seed"}
+        ),
     }
 
 
