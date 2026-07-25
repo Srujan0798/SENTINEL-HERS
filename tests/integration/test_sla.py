@@ -105,7 +105,8 @@ class TestTaskCRUD:
         )
         resp = client.get(f"/api/incidents/{incident_id}/tasks", headers=auth["headers"])
         assert resp.status_code == 200
-        tasks = resp.json()
+        body = resp.json()
+        tasks = body.get("data", body) if isinstance(body, dict) else body
         assert isinstance(tasks, list)
         assert len(tasks) >= 2
 
