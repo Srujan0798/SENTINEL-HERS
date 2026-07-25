@@ -308,7 +308,19 @@ export default function IncidentsPage() {
     [incidents]
   );
 
-  if (loading) return <div className="flex items-center justify-center h-64 text-muted-foreground">Loading…</div>;
+  if (loading) return (
+    <div className="space-y-6">
+      <div className="h-8 w-48 bg-muted rounded animate-pulse" />
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+        <div className="lg:col-span-2 space-y-3">
+          {[1,2,3].map((i) => (
+            <div key={i} className="h-24 bg-muted rounded-lg animate-pulse" />
+          ))}
+        </div>
+        <div className="h-96 bg-muted rounded-lg animate-pulse" />
+      </div>
+    </div>
+  );
 
   return (
     <div className="space-y-6">
@@ -339,18 +351,33 @@ export default function IncidentsPage() {
         <div className="lg:col-span-2 space-y-3">
           {incidents.length === 0 && (
             <Card>
-              <CardContent className="py-8 text-center text-muted-foreground">No incidents yet.</CardContent>
+              <CardContent className="py-12 text-center">
+                <p className="text-muted-foreground text-sm mb-2">No incidents yet.</p>
+                <p className="text-xs text-muted-foreground">
+                  Use <span className="font-mono text-primary">Voice → ticket</span> above or wait for a webhook to create one.
+                </p>
+              </CardContent>
             </Card>
           )}
           {incidents.map((inc) => (
             <Card
               key={inc.id}
-              className={`cursor-pointer transition-all hover:ring-2 hover:ring-primary ${
+              tabIndex={0}
+              role="button"
+              aria-label={`Open incident: ${inc.title}`}
+              className={`cursor-pointer transition-all hover:ring-2 hover:ring-primary focus-visible:ring-2 focus-visible:ring-primary focus-visible:outline-none ${
                 selected?.id === inc.id ? "ring-2 ring-primary" : ""
               }`}
               onClick={() => {
                 loadSummary(inc);
                 router.replace(`/incidents?id=${inc.id}`, { scroll: false });
+              }}
+              onKeyDown={(e) => {
+                if (e.key === "Enter" || e.key === " ") {
+                  e.preventDefault();
+                  loadSummary(inc);
+                  router.replace(`/incidents?id=${inc.id}`, { scroll: false });
+                }
               }}
             >
               <CardContent className="py-4">
@@ -368,6 +395,9 @@ export default function IncidentsPage() {
                       {inc.severity}
                     </Badge>
                     <Badge variant={STATUS_BADGE[inc.status] || "default"}>{inc.status}</Badge>
+                    {inc.escalated_to && (
+                      <Badge variant="destructive" className="text-[10px]">ESCALATED</Badge>
+                    )}
                   </div>
                 </div>
               </CardContent>

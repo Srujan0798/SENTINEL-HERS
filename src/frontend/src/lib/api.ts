@@ -66,8 +66,10 @@ export interface Incident {
   updated_at: string;
   resolved_at?: string;
   assigned_to?: string;
+  escalated_to?: string;
   detected_at?: string;
   team_id?: string;
+  ai_summary?: string;
 }
 
 export interface TimelineEvent {
