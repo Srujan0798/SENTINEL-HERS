@@ -6,31 +6,35 @@
 
 | Item | Status |
 |------|--------|
-| Full suite | ✅ **185 passed** (last green run this session) |
-| Vercel | ✅ `https://sentinel-hers.vercel.app` — login demo fill, war room, Settings, Monitoring, dashboard SLA |
-| Render API | ✅ `https://sentinel-api-clu9.onrender.com` — healthz, CORS, auth, SSE, seed |
-| Demo ready | ✅ `/api/demo-status` → ready · `demo@sentinel.io` / `Sentinel2026!` |
-| Seeded path | ✅ 3 incidents (1 SEV1 open) · 4 timeline · 4 tasks · 1 channel msg · 3 alerts · 4 deps · 5 service health |
-| AI | ✅ summary · root-causes · postmortem · RAG chat (`question`) |
-| Realtime | ✅ `GET /api/realtime/events` → `event: connected` |
-| Auth cookies | ✅ access/refresh cookies + dual-write `sentinel_token` |
+| Suite | ✅ **185 passed** (session re-run) |
+| Vercel | ✅ `https://sentinel-hers.vercel.app` — demo fill, war room, Settings, Monitoring, dashboard SLA |
+| Render | ✅ `https://sentinel-api-clu9.onrender.com` — healthz, CORS, auth, SSE, seed |
+| Demo ready | ✅ `/api/demo-status` → `ready` · `open_sev1_count: 1` |
+| Demo login | ✅ `demo@sentinel.io` / `Sentinel2026!` |
+| SEV1 war room | ✅ timeline 4+ · tasks 4 · messages 1 · SLA · AI summary · assign/advance |
+| Timeline POST | ✅ `{event_type, source, description}` → **201** (shadow model fixed `6511c41`) |
+| Deployments | ✅ 4 seeded · commits 4 |
+| Service health | ✅ 5 rows |
+| Alerts | ✅ 3 |
+| Realtime SSE | ✅ `GET /api/realtime/events` → `event: connected` |
+| Auth | ✅ cookies + `access_token`/`sentinel_token` dual-write |
 
-## Demo path (judges)
-1. Open FE → **Fill demo credentials** → Sign in  
-2. Dashboard → **Open SEV1 war room** (or Incidents auto-selects open SEV1)  
-3. See AI summary · live SLA countdown · timeline · tasks · Comms · assign/status · RAG chat  
-4. Monitoring (alerts + service health) · Deployments (non-empty) · Analytics (MTTR + anomalies)
+## Judge demo path
+1. FE → **Fill demo credentials** → Sign in  
+2. Dashboard → **Open SEV1 war room** (Incidents also auto-selects open SEV1)  
+3. War room: AI summary · live SLA · timeline · tasks · Comms · **Advance** status · RCA · RAG chat · Voice  
+4. Monitoring (alerts + service health) · Deployments · Analytics  
 
-## Recent shipped (main)
-- `ee118e2` auto-open SEV1 + live SLA + dashboard `/api/sla` honesty  
-- `332ee02` health never 500 · seed SEV1 comms · login demo fill · SSE named events  
-- `d4605a1` monitoring `/api/alerts` · mount realtime · StatusBar path  
-- `347e6ca` war room mount · Settings page · token dual-read · deployment seed  
+## Recent main (deploy-critical)
+- `6511c41` timeline POST: remove shadow `TimelineEventCreate`  
+- `a5ee98f` seed repair open SEV1 + demo-status `open_sev1_count`  
+- `c96a574` legal status transitions + Advance button  
+- `01a5c87` Vercel TS fix (root-cause mapping)  
 
-## Remaining polish (non-blockers)
+## Remaining (optional, not blockers)
 - Security review pass (rubric Security 15%)  
-- Containers always unavailable on Render (honest UI; FE/BE timeouts)  
 - Browser voice mic E2E (text fallback works)  
+- Do **not** resolve SEV1 in automated probes  
 
 ## Submit
 - GitHub: https://github.com/Srujan0798/SENTINEL-HERS  
