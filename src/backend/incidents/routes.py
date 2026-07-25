@@ -8,7 +8,6 @@ from src.backend.auth.dependencies import get_current_user_dependency
 
 from .database import get_db
 from .enums import IncidentStatus, InvalidStateTransition, SeverityLevel
-from pydantic import BaseModel
 
 from .schemas import (
     AssignRequest,
@@ -16,15 +15,11 @@ from .schemas import (
     IncidentListResponse,
     IncidentResponse,
     IncidentUpdate,
+    TimelineEventCreate,
     TimelineListResponse,
     TimelineEventResponse,
 )
 from .service import IncidentNotFound, IncidentService
-
-
-class TimelineEventCreate(BaseModel):
-    type: str
-    description: str | None = None
 
 router = APIRouter(prefix="/api/incidents", tags=["incidents"])
 
