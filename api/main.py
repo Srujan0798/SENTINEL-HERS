@@ -99,3 +99,7 @@ app.include_router(voice_router)
 
 from src.backend.seed.routes import router as seed_router
 app.include_router(seed_router)
+
+# Realtime SSE + WebSocket (StatusBar / Comms live updates)
+from src.backend.realtime.router import router as realtime_router
+app.include_router(realtime_router, prefix="/api")

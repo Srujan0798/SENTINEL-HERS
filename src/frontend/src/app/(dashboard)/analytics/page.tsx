@@ -5,16 +5,20 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { api, type AnalyticsSummary, type AnomalySeriesData } from "@/lib/api";
 
 interface TopError {
-  message: string;
-  count: number;
+  /** API returns service + error_count; older shape used message/count */
   service: string;
+  error_count?: number;
+  message?: string;
+  count?: number;
 }
 
 interface AlertTrend {
   total_alerts: number;
   resolved_alerts: number;
   open_alerts: number;
-  resolution_rate: number;
+  resolution_rate?: number;
+  by_severity?: Record<string, number>;
+  period_days?: number;
 }
 
 const riskColor: Record<string, string> = {
@@ -80,7 +84,15 @@ export default function AnalyticsPage() {
           </CardHeader>
           <CardContent>
             <div className="text-3xl font-bold text-green-600">
-              {trend ? `${Math.round(trend.resolution_rate * 100)}%` : "—"}
+              {trend
+                ? `${Math.round(
+                    (trend.resolution_rate != null
+                      ? trend.resolution_rate
+                      : trend.total_alerts > 0
+                      ? trend.resolved_alerts / trend.total_alerts
+                      : 0) * 100
+                  )}%`
+                : "—"}
             </div>
           </CardContent>
         </Card>
@@ -127,22 +139,28 @@ export default function AnalyticsPage() {
         {/* Top Errors */}
         <Card>
           <CardHeader>
-            <CardTitle>Top Error Messages</CardTitle>
+            <CardTitle>Top Error Services</CardTitle>
           </CardHeader>
           <CardContent>
             {topErrors.length === 0 ? (
               <p className="text-muted-foreground text-sm">No error logs yet.</p>
             ) : (
               <div className="space-y-3">
-                {topErrors.slice(0, 8).map((e, i) => (
-                  <div key={i} className="flex items-start justify-between gap-2">
-                    <div className="min-w-0 flex-1">
-                      <p className="text-sm truncate">{e.message}</p>
-                      <p className="text-xs text-muted-foreground">{e.service}</p>
+                {topErrors.slice(0, 8).map((e, i) => {
+                  const count = e.error_count ?? e.count ?? 0;
+                  const label = e.message || e.service || "unknown";
+                  return (
+                    <div key={i} className="flex items-start justify-between gap-2">
+                      <div className="min-w-0 flex-1">
+                        <p className="text-sm truncate">{label}</p>
+                        {e.message && e.service && (
+                          <p className="text-xs text-muted-foreground">{e.service}</p>
+                        )}
+                      </div>
+                      <span className="text-sm font-bold text-red-600 shrink-0">{count}×</span>
                     </div>
-                    <span className="text-sm font-bold text-red-600 shrink-0">{e.count}×</span>
-                  </div>
-                ))}
+                  );
+                })}
               </div>
             )}
           </CardContent>

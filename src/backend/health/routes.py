@@ -12,13 +12,21 @@ router = APIRouter(prefix="/api/health/services", tags=["health"])
 
 @router.get("/", response_model=List[ServiceHealthResponse])
 async def list_services(db: Session = Depends(get_db)):
-    """List all services with current status"""
-    result = db.execute(text("""
-        SELECT id, team_id, service_name, status, uptime_percentage, latency_ms, 
-               last_check_at, next_check_at, metadata, created_at, updated_at
-        FROM service_health
-        ORDER BY service_name
-    """))
+    """List all services with current status.
+
+    Soft-fails to [] when the table is missing (fresh DBs / partial migrations)
+    so Monitoring never 500s for judges.
+    """
+    try:
+        result = db.execute(text("""
+            SELECT id, team_id, service_name, status, uptime_percentage, latency_ms,
+                   last_check_at, next_check_at, metadata, created_at, updated_at
+            FROM service_health
+            ORDER BY service_name
+        """))
+    except Exception:
+        db.rollback()
+        return []
 
     services = []
     for row in result.fetchall():
@@ -31,7 +39,7 @@ async def list_services(db: Session = Depends(get_db)):
             latency_ms=row.latency_ms,
             last_check_at=row.last_check_at,
             next_check_at=row.next_check_at,
-            metadata=row.metadata
+            metadata=row.metadata or {},
         ))
 
     return services

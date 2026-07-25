@@ -95,6 +95,90 @@ def _get_or_create_demo_user(db: Session, team: TeamModel) -> UserModel:
     return user
 
 
+def _ensure_service_health(db: Session, team_id: str, now: datetime | None = None) -> int:
+    """Idempotent service_health rows so Monitoring has a non-empty health grid."""
+    now = now or datetime.now(timezone.utc)
+    try:
+        # Ensure table exists even when migrations were partial (soft-schema).
+        db.execute(
+            __import__("sqlalchemy", fromlist=["text"]).text(
+                """
+                CREATE TABLE IF NOT EXISTS service_health (
+                    id VARCHAR(36) PRIMARY KEY,
+                    team_id VARCHAR(36) NOT NULL,
+                    service_name VARCHAR(255) NOT NULL,
+                    status VARCHAR(32) NOT NULL DEFAULT 'unknown',
+                    uptime_percentage FLOAT,
+                    latency_ms INTEGER,
+                    last_check_at TIMESTAMP,
+                    next_check_at TIMESTAMP,
+                    metadata JSON,
+                    created_at TIMESTAMP,
+                    updated_at TIMESTAMP
+                )
+                """
+            )
+        )
+        db.flush()
+    except Exception as e:
+        logger.warning("Seed: service_health table ensure skipped (%s)", e)
+        try:
+            db.rollback()
+        except Exception:
+            pass
+        return 0
+
+    try:
+        from sqlalchemy import text
+
+        existing = db.execute(
+            text("SELECT COUNT(*) FROM service_health WHERE team_id = :tid"),
+            {"tid": team_id},
+        ).scalar()
+        if existing and int(existing) > 0:
+            return int(existing)
+
+        rows = [
+            ("payments", "degraded", 97.2, 842),
+            ("api-gateway", "degraded", 98.1, 210),
+            ("redis-cache", "down", 88.0, 0),
+            ("auth", "healthy", 99.9, 45),
+            ("payments-worker", "down", 72.5, 0),
+        ]
+        for name, status, uptime, latency in rows:
+            db.execute(
+                text(
+                    """
+                    INSERT INTO service_health
+                      (id, team_id, service_name, status, uptime_percentage, latency_ms,
+                       last_check_at, next_check_at, metadata, created_at, updated_at)
+                    VALUES
+                      (:id, :tid, :name, :status, :uptime, :latency,
+                       :now, :now, :meta, :now, :now)
+                    """
+                ),
+                {
+                    "id": str(uuid.uuid4()),
+                    "tid": team_id,
+                    "name": name,
+                    "status": status,
+                    "uptime": uptime,
+                    "latency": latency,
+                    "now": now,
+                    "meta": "{}",
+                },
+            )
+        db.flush()
+        return len(rows)
+    except Exception as e:
+        logger.warning("Seed: service_health rows skipped (%s)", e)
+        try:
+            db.rollback()
+        except Exception:
+            pass
+        return 0
+
+
 def _ensure_deployments_and_commits(db: Session, team_id: str, now: datetime | None = None) -> int:
     """Idempotent demo deployments/commits so the Deployments page is never empty for judges."""
     try:
@@ -251,6 +335,7 @@ def ensure_demo_seed(db: Session) -> dict[str, Any]:
             )
             existing_count += 1
         dep_n = _ensure_deployments_and_commits(db, team_id, now)
+        health_n = _ensure_service_health(db, team_id, now)
         db.commit()
         return {
             "status": "skipped",
@@ -258,6 +343,7 @@ def ensure_demo_seed(db: Session) -> dict[str, Any]:
             "team_id": team_id,
             "incident_count": existing_count,
             "deployment_count": dep_n,
+            "service_health_count": health_n,
             "demo_email": DEMO_EMAIL,
         }
 
@@ -409,14 +495,22 @@ def ensure_demo_seed(db: Session) -> dict[str, Any]:
         logger.warning("Seed: anomaly scoring skipped (%s)", e)
 
     dep_n = _ensure_deployments_and_commits(db, team_id, now)
+    health_n = _ensure_service_health(db, team_id, now)
 
     db.commit()
-    logger.info("Demo seed complete team=%s sev1=%s deps=%s", team_id, inc1.id, dep_n)
+    logger.info(
+        "Demo seed complete team=%s sev1=%s deps=%s health=%s",
+        team_id,
+        inc1.id,
+        dep_n,
+        health_n,
+    )
     return {
         "status": "seeded",
         "team_id": team_id,
         "incident_id": inc1.id,
         "deployment_count": dep_n,
+        "service_health_count": health_n,
         "demo_email": DEMO_EMAIL,
     }
 

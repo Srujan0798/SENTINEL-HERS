@@ -29,7 +29,8 @@ export function StatusBar({ teamId }: StatusBarProps) {
       return;
     }
 
-    const url = `${base}/api/realtime/sse?token=${encodeURIComponent(token)}`;
+    // Backend router: GET /api/realtime/events?token=… (not /sse)
+    const url = `${base}/api/realtime/events?token=${encodeURIComponent(token)}`;
     const es = new EventSource(url);
 
     es.onopen = () => setState("connected");

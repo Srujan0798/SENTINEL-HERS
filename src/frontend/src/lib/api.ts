@@ -89,13 +89,19 @@ export interface LogEntry {
 
 export interface Alert {
   id: string;
-  name: string;
+  team_id?: string;
   source: string;
+  alert_type?: string;
+  title: string;
+  description?: string | null;
   severity: string;
-  message: string;
-  service?: string;
-  status: string;
+  is_resolved: boolean;
   fired_at: string;
+  created_at?: string;
+  /** Legacy aliases some older UI paths used */
+  name?: string;
+  message?: string;
+  status?: string;
 }
 
 export interface AnalyticsSummary {
