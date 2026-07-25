@@ -28,6 +28,15 @@ class TokenResponse(BaseModel):
     user: "UserResponse"
 
 
+class RoleResponse(BaseModel):
+    """Nested role so the FE can gate nav (useRole → role.name) without a second call."""
+
+    id: str
+    name: str
+    permissions: list[str] = []
+    description: Optional[str] = None
+
+
 class UserResponse(BaseModel):
     id: UUID
     team_id: UUID
@@ -35,6 +44,7 @@ class UserResponse(BaseModel):
     name: str
     avatar_url: Optional[str] = None
     role_id: Optional[str] = None
+    role: Optional[RoleResponse] = None
     is_active: bool
     last_login_at: Optional[datetime] = None
     created_at: Optional[datetime] = None

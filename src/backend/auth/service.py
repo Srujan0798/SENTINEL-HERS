@@ -12,10 +12,11 @@ from .models import (
     LoginRequest,
     RegisterRequest,
     RefreshRequest,
+    RoleResponse,
     TokenResponse,
     UserResponse,
 )
-from src.backend.shared_models import TeamModel, UserModel
+from src.backend.shared_models import RoleModel, TeamModel, UserModel
 
 _jwt = os.getenv("JWT_SECRET")
 _jwt_refresh = os.getenv("JWT_REFRESH_SECRET")
@@ -154,14 +155,41 @@ def get_user(db: Session, user_id: str) -> Optional[UserModel]:
     return db.query(UserModel).filter(UserModel.id == user_id).first()
 
 
-def _user_response(user: UserModel) -> UserResponse:
+def _resolve_role(db: Session, role_id) -> Optional[RoleModel]:
+    if not role_id:
+        return None
+    return db.query(RoleModel).filter(RoleModel.id == str(role_id)).first()
+
+
+def _role_name(db: Session, user: UserModel, default: str = "admin") -> str:
+    """JWT + RBAC need a role *name* (admin/…), never a role_id UUID."""
+    role = _resolve_role(db, getattr(user, "role_id", None))
+    if role and role.name:
+        return str(role.name)
+    return default
+
+
+def _user_response(user: UserModel, db: Optional[Session] = None) -> UserResponse:
+    role_resp: Optional[RoleResponse] = None
+    role_id = str(user.role_id) if user.role_id else None
+    if db is not None and role_id:
+        role = _resolve_role(db, role_id)
+        if role:
+            perms = role.permissions if isinstance(role.permissions, list) else []
+            role_resp = RoleResponse(
+                id=str(role.id),
+                name=str(role.name),
+                permissions=[str(p) for p in perms],
+                description=role.description,
+            )
     return UserResponse(
         id=user.id,
         team_id=user.team_id,
         email=user.email,
         name=user.name,
         avatar_url=user.avatar_url,
-        role_id=str(user.role_id) if user.role_id else None,
+        role_id=role_id,
+        role=role_resp,
         is_active=user.is_active,
         last_login_at=getattr(user, "last_login_at", None),
         created_at=user.created_at,
@@ -180,12 +208,14 @@ def register(request: RegisterRequest, db: Session) -> TokenResponse:
     password_hash = hash_password(request.password)
     user = create_user(db, request.email, password_hash, request.name, team.id)
     db.commit()
+    # re-load after commit so role_id is stable
+    role_name = _role_name(db, user, default="admin")
 
     return TokenResponse(
-        access_token=create_access_token(user.id, team.id, "admin"),
-        refresh_token=create_refresh_token(user.id, team.id, "admin"),
+        access_token=create_access_token(user.id, team.id, role_name),
+        refresh_token=create_refresh_token(user.id, team.id, role_name),
         expires_in=ACCESS_TOKEN_EXPIRE_MINUTES * 60,
-        user=_user_response(user),
+        user=_user_response(user, db),
     )
 
 
@@ -204,12 +234,13 @@ def login(request: LoginRequest, db: Session) -> TokenResponse:
 
     user.last_login_at = datetime.now(timezone.utc)
     db.commit()
+    role_name = _role_name(db, user, default="admin")
 
     return TokenResponse(
-        access_token=create_access_token(user.id, user.team_id, "admin"),
-        refresh_token=create_refresh_token(user.id, user.team_id, "admin"),
+        access_token=create_access_token(user.id, user.team_id, role_name),
+        refresh_token=create_refresh_token(user.id, user.team_id, role_name),
         expires_in=ACCESS_TOKEN_EXPIRE_MINUTES * 60,
-        user=_user_response(user),
+        user=_user_response(user, db),
     )
 
 
@@ -227,11 +258,12 @@ def refresh_token(request: RefreshRequest, db: Session) -> TokenResponse:
             detail="Account is deactivated",
         )
 
+    role_name = _role_name(db, user, default="admin")
     return TokenResponse(
-        access_token=create_access_token(user.id, user.team_id, "admin"),
-        refresh_token=create_refresh_token(user.id, user.team_id, "admin"),
+        access_token=create_access_token(user.id, user.team_id, role_name),
+        refresh_token=create_refresh_token(user.id, user.team_id, role_name),
         expires_in=ACCESS_TOKEN_EXPIRE_MINUTES * 60,
-        user=_user_response(user),
+        user=_user_response(user, db),
     )
 
 
@@ -248,11 +280,19 @@ def get_current_user(token: str, db: Session) -> dict:
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Account is deactivated",
         )
+    # Prefer JWT role claim (already a name); fall back to DB role name.
+    jwt_role = payload.get("role")
+    role_name = (
+        jwt_role
+        if isinstance(jwt_role, str) and jwt_role and "-" not in jwt_role
+        else _role_name(db, user, default="admin")
+    )
     return {
         # cast UUID → str so downstream inserts/queries bind cleanly on SQLite
         "id": str(user.id),
         "team_id": str(user.team_id) if user.team_id else None,
-        "role": user.role_id,
+        "role": role_name,
+        "role_id": str(user.role_id) if user.role_id else None,
         "email": user.email,
         "name": user.name,
         "is_active": user.is_active,
@@ -267,4 +307,4 @@ def get_user_response(user_id: str, db: Session) -> UserResponse:
             status_code=status.HTTP_404_NOT_FOUND,
             detail="User not found",
         )
-    return _user_response(user)
+    return _user_response(user, db)

@@ -252,9 +252,31 @@ export function useUser(): User | null {
   return state.user;
 }
 
+function roleFromJwt(): string | null {
+  if (typeof window === "undefined") return null;
+  const token = localStorage.getItem("access_token") || localStorage.getItem("sentinel_token");
+  if (!token) return null;
+  try {
+    const part = token.split(".")[1];
+    if (!part) return null;
+    const padded = part.replace(/-/g, "+").replace(/_/g, "/");
+    const pad = padded.length % 4 === 0 ? "" : "=".repeat(4 - (padded.length % 4));
+    const payload = JSON.parse(atob(padded + pad)) as { role?: unknown };
+    // JWT carries role *name* (admin/…); reject UUID-shaped leftovers.
+    if (typeof payload.role === "string" && payload.role && !payload.role.includes("-")) {
+      return payload.role;
+    }
+  } catch {
+    /* ignore malformed tokens */
+  }
+  return null;
+}
+
 export function useRole(): string | null {
   const user = useUser();
-  return user?.role?.name ?? null;
+  // Nested role from API (preferred) — required for nav gating in layout.tsx.
+  // JWT fallback keeps Settings/Monitoring/etc. visible if /auth/me omits role.
+  return user?.role?.name ?? roleFromJwt();
 }
 
 export function useHasPermission(permission: string): boolean {
