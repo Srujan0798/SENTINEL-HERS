@@ -22,7 +22,7 @@ export interface User {
   name: string;
   avatar_url: string | null;
   role_id: string;
-  role: Role;
+  role?: Role | null;
   is_active: boolean;
   last_login_at: string | null;
   created_at: string;
@@ -49,10 +49,6 @@ export interface LoginResponse {
   user: User;
 }
 
-export interface RefreshRequest {
-  refresh_token: string;
-}
-
 interface AuthState {
   user: User | null;
   accessToken: string | null;
@@ -69,34 +65,69 @@ const initialState: AuthState = {
   isAuthenticated: false,
 };
 
-// Tokens live in localStorage (read by client fetches via Authorization header)
-// AND in a client-readable cookie. The cookie is what the Next.js edge
-// middleware reads to gate protected routes — without it, middleware never sees
-// the session and bounces every protected page back to /login. This cookie is
-// NOT the security boundary: the API validates the Bearer JWT on every request;
-// the cookie is only a client-side route-guard hint.
-const COOKIE_MAX_AGE = 60 * 60 * 24 * 7; // 7 days (refresh token lifetime bound)
+// Session cookie is a tiny route-guard flag for Next middleware.
+// Full JWTs live in localStorage (and a short-lived access cookie when size allows).
+// Middleware only needs to know "has session" — API still validates Bearer JWT.
+const SESSION_FLAG = "sentinel_session";
+const COOKIE_MAX_AGE = 60 * 60 * 24 * 7;
 
-function tokenCookieAttrs(): string {
+function cookieBase(): string {
   const secure = typeof window !== "undefined" && window.location.protocol === "https:";
   return `path=/; max-age=${COOKIE_MAX_AGE}; SameSite=Lax${secure ? "; Secure" : ""}`;
+}
+
+function setCookie(name: string, value: string) {
+  // Encode so JWT characters never break the Set-Cookie parser.
+  document.cookie = `${name}=${encodeURIComponent(value)}; ${cookieBase()}`;
+}
+
+function clearCookie(name: string) {
+  document.cookie = `${name}=; path=/; max-age=0; SameSite=Lax`;
+}
+
+/** Normalize FastAPI error bodies into a human string (not "[object Object]"). */
+export function formatApiError(detail: unknown, fallback = "Request failed"): string {
+  if (detail == null) return fallback;
+  if (typeof detail === "string") return detail;
+  if (Array.isArray(detail)) {
+    return detail
+      .map((item) => {
+        if (typeof item === "string") return item;
+        if (item && typeof item === "object" && "msg" in item) {
+          return String((item as { msg: string }).msg);
+        }
+        return JSON.stringify(item);
+      })
+      .join("; ");
+  }
+  if (typeof detail === "object" && detail !== null && "detail" in detail) {
+    return formatApiError((detail as { detail: unknown }).detail, fallback);
+  }
+  try {
+    return JSON.stringify(detail);
+  } catch {
+    return fallback;
+  }
 }
 
 function persistTokens(accessToken: string, refreshToken: string) {
   localStorage.setItem("access_token", accessToken);
   localStorage.setItem("refresh_token", refreshToken);
-  // Legacy alias still read by a few components (StatusBar/Deployments historically).
   localStorage.setItem("sentinel_token", accessToken);
-  document.cookie = `access_token=${accessToken}; ${tokenCookieAttrs()}`;
-  document.cookie = `refresh_token=${refreshToken}; ${tokenCookieAttrs()}`;
+  // Tiny flag middleware always accepts (avoids cookie size / parse edge cases).
+  setCookie(SESSION_FLAG, "1");
+  // Also store tokens for any code reading cookies; encode for safety.
+  setCookie("access_token", accessToken);
+  setCookie("refresh_token", refreshToken);
 }
 
 function clearTokens() {
   localStorage.removeItem("access_token");
   localStorage.removeItem("refresh_token");
   localStorage.removeItem("sentinel_token");
-  document.cookie = "access_token=; path=/; max-age=0; SameSite=Lax";
-  document.cookie = "refresh_token=; path=/; max-age=0; SameSite=Lax";
+  clearCookie(SESSION_FLAG);
+  clearCookie("access_token");
+  clearCookie("refresh_token");
 }
 
 const AuthContext = createContext<{
@@ -105,7 +136,7 @@ const AuthContext = createContext<{
   register: (data: RegisterRequest) => Promise<void>;
   logout: () => Promise<void>;
   refreshAccessToken: () => Promise<void>;
-}>(null!);
+} | null>(null);
 
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [state, setState] = useState<AuthState>(initialState);
@@ -116,18 +147,26 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       const refreshToken = localStorage.getItem("refresh_token");
 
       if (accessToken && refreshToken) {
+        // Re-assert session cookie so middleware stays happy after hard refresh.
+        setCookie(SESSION_FLAG, "1");
         setState((prev) => ({ ...prev, accessToken, refreshToken }));
         try {
           await fetchUser(accessToken);
         } catch {
-          await refreshAccessToken();
+          try {
+            await refreshAccessToken();
+          } catch {
+            clearTokens();
+            setState({ ...initialState, isLoading: false });
+          }
         }
       } else {
         setState((prev) => ({ ...prev, isLoading: false }));
       }
     };
 
-    initAuth();
+    void initAuth();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   const fetchUser = async (token: string) => {
@@ -139,7 +178,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       throw new Error("Failed to fetch user");
     }
 
-    const user = await response.json();
+    const user = (await response.json()) as User;
     setState((prev) => ({
       ...prev,
       user,
@@ -149,18 +188,28 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   };
 
   const login = async (credentials: LoginRequest) => {
-    const response = await fetch(`${API_BASE}/auth/login`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(credentials),
-    });
+    let response: Response;
+    try {
+      response = await fetch(`${API_BASE}/auth/login`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(credentials),
+      });
+    } catch {
+      throw new Error(
+        `Cannot reach API at ${API_BASE}. Check NEXT_PUBLIC_API_BASE_URL and CORS.`
+      );
+    }
 
     if (!response.ok) {
-      const error = await response.json();
-      throw new Error(error.detail || "Login failed");
+      const error = await response.json().catch(() => ({}));
+      throw new Error(formatApiError(error, `Login failed (${response.status})`));
     }
 
     const data: LoginResponse = await response.json();
+    if (!data.access_token || !data.refresh_token) {
+      throw new Error("Login response missing tokens");
+    }
     persistTokens(data.access_token, data.refresh_token);
 
     setState({
@@ -173,15 +222,22 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   };
 
   const register = async (data: RegisterRequest) => {
-    const response = await fetch(`${API_BASE}/auth/register`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(data),
-    });
+    let response: Response;
+    try {
+      response = await fetch(`${API_BASE}/auth/register`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(data),
+      });
+    } catch {
+      throw new Error(
+        `Cannot reach API at ${API_BASE}. Check NEXT_PUBLIC_API_BASE_URL and CORS.`
+      );
+    }
 
     if (!response.ok) {
-      const error = await response.json();
-      throw new Error(error.detail || "Registration failed");
+      const error = await response.json().catch(() => ({}));
+      throw new Error(formatApiError(error, `Registration failed (${response.status})`));
     }
 
     const result: LoginResponse = await response.json();
@@ -199,7 +255,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const refreshAccessToken = async () => {
     const refreshToken = localStorage.getItem("refresh_token");
     if (!refreshToken) {
-      setState(initialState);
+      clearTokens();
+      setState({ ...initialState, isLoading: false });
       return;
     }
 
@@ -211,7 +268,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
     if (!response.ok) {
       clearTokens();
-      setState(initialState);
+      setState({ ...initialState, isLoading: false });
       return;
     }
 
@@ -229,7 +286,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   const logout = async () => {
     clearTokens();
-    setState(initialState);
+    setState({ ...initialState, isLoading: false });
   };
 
   return (
@@ -262,21 +319,18 @@ function roleFromJwt(): string | null {
     const padded = part.replace(/-/g, "+").replace(/_/g, "/");
     const pad = padded.length % 4 === 0 ? "" : "=".repeat(4 - (padded.length % 4));
     const payload = JSON.parse(atob(padded + pad)) as { role?: unknown };
-    // JWT carries role *name* (admin/…); reject UUID-shaped leftovers.
     if (typeof payload.role === "string" && payload.role && !payload.role.includes("-")) {
       return payload.role;
     }
   } catch {
-    /* ignore malformed tokens */
+    /* ignore */
   }
   return null;
 }
 
 export function useRole(): string | null {
   const user = useUser();
-  // Nested role from API (preferred) — required for nav gating in layout.tsx.
-  // JWT fallback keeps Settings/Monitoring/etc. visible if /auth/me omits role.
-  return user?.role?.name ?? roleFromJwt();
+  return user?.role?.name ?? roleFromJwt() ?? null;
 }
 
 export function useHasPermission(permission: string): boolean {
@@ -288,7 +342,7 @@ export function useHasPermission(permission: string): boolean {
 
 export function getAccessToken(): string | null {
   if (typeof window === "undefined") return null;
-  return localStorage.getItem("access_token");
+  return localStorage.getItem("access_token") || localStorage.getItem("sentinel_token");
 }
 
 export async function authenticatedFetch(
@@ -297,15 +351,14 @@ export async function authenticatedFetch(
 ): Promise<Response> {
   const token = getAccessToken();
   const headers = new Headers(options.headers);
-  if (token) {
-    headers.set("Authorization", `Bearer ${token}`);
-  }
+  if (token) headers.set("Authorization", `Bearer ${token}`);
   headers.set("Content-Type", "application/json");
 
   let response = await fetch(url, { ...options, headers });
 
   if (response.status === 401) {
-    const refreshToken = typeof window !== "undefined" ? localStorage.getItem("refresh_token") : null;
+    const refreshToken =
+      typeof window !== "undefined" ? localStorage.getItem("refresh_token") : null;
     if (refreshToken) {
       const refreshed = await fetch(`${API_BASE}/auth/refresh`, {
         method: "POST",
@@ -314,10 +367,7 @@ export async function authenticatedFetch(
       });
       if (refreshed.ok) {
         const data = await refreshed.json();
-        localStorage.setItem("access_token", data.access_token);
-        localStorage.setItem("sentinel_token", data.access_token);
-        const secure = window.location.protocol === "https:";
-        document.cookie = `access_token=${data.access_token}; path=/; max-age=${60 * 60 * 24 * 7}; SameSite=Lax${secure ? "; Secure" : ""}`;
+        persistTokens(data.access_token, data.refresh_token);
         headers.set("Authorization", `Bearer ${data.access_token}`);
         response = await fetch(url, { ...options, headers });
       }
@@ -326,3 +376,5 @@ export async function authenticatedFetch(
 
   return response;
 }
+
+export { API_BASE as AUTH_API_BASE };

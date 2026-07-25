@@ -1,14 +1,16 @@
 "use client";
 
 import { useState, Suspense } from "react";
-import { useRouter, useSearchParams } from "next/navigation";
+import { useSearchParams } from "next/navigation";
 import Link from "next/link";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { useAuth } from "@/lib/auth";
+import { useAuth, formatApiError } from "@/lib/auth";
+
+const DEMO_EMAIL = "demo@sentinel.io";
+const DEMO_PASSWORD = "Sentinel2026!";
 
 function LoginForm() {
-  const router = useRouter();
   const searchParams = useSearchParams();
   const { login } = useAuth();
   const redirectTo = searchParams.get("redirect") || "/dashboard";
@@ -18,34 +20,58 @@ function LoginForm() {
   const [error, setError] = useState("");
   const [isLoading, setIsLoading] = useState(false);
 
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
+  const goAfterLogin = () => {
+    // Full page navigation so middleware always sees cookies on the next request.
+    // (client router.push alone caused "login then bounce" for judges.)
+    window.location.assign(redirectTo.startsWith("/") ? redirectTo : "/dashboard");
+  };
+
+  const runLogin = async (e?: string, p?: string) => {
     setError("");
     setIsLoading(true);
-
+    const em = (e ?? email).trim();
+    const pw = p ?? password;
     try {
-      await login({ email, password });
-      router.push(redirectTo);
-      router.refresh();
+      await login({ email: em, password: pw });
+      goAfterLogin();
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Login failed");
-    } finally {
+      const msg =
+        err instanceof Error
+          ? err.message
+          : formatApiError(err, "Login failed — check email/password and API URL");
+      setError(msg);
       setIsLoading(false);
     }
   };
 
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    await runLogin();
+  };
+
+  const handleDemoLogin = async () => {
+    setEmail(DEMO_EMAIL);
+    setPassword(DEMO_PASSWORD);
+    await runLogin(DEMO_EMAIL, DEMO_PASSWORD);
+  };
+
   return (
-    <div className="min-h-screen flex items-center justify-center bg-muted/30 px-4 py-12">
-      <Card className="w-full max-w-md">
-        <CardHeader className="text-center">
-          <CardTitle className="text-2xl font-bold">Sign in to SENTINEL</CardTitle>
-          <CardDescription>Enter your credentials to access the dashboard</CardDescription>
+    <div className="min-h-screen flex items-center justify-center bg-zinc-950 px-4 py-12">
+      <Card className="w-full max-w-md border-zinc-800 bg-zinc-900 text-zinc-50 shadow-2xl">
+        <CardHeader className="text-center space-y-2">
+          <p className="text-xs font-semibold tracking-[0.2em] text-emerald-400 uppercase">
+            SENTINEL
+          </p>
+          <CardTitle className="text-2xl font-bold text-white">Sign in</CardTitle>
+          <CardDescription className="text-zinc-400">
+            AI-native engineering operations — live demo ready for judges
+          </CardDescription>
         </CardHeader>
         <CardContent>
           <form onSubmit={handleSubmit} className="space-y-4">
             {error && (
               <div
-                className="p-3 text-sm text-destructive bg-destructive/10 border border-destructive/20 rounded-md"
+                className="p-3 text-sm text-red-200 bg-red-950/60 border border-red-800 rounded-md whitespace-pre-wrap"
                 role="alert"
               >
                 {error}
@@ -53,66 +79,68 @@ function LoginForm() {
             )}
 
             <div className="space-y-2">
-              <label htmlFor="email" className="text-sm font-medium">
+              <label htmlFor="email" className="text-sm font-medium text-zinc-200">
                 Email
               </label>
               <input
                 id="email"
                 type="email"
+                autoComplete="username"
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
-                className="w-full px-3 py-2 border border-input rounded-md bg-background focus:outline-none focus:ring-2 focus:ring-ring disabled:cursor-not-allowed disabled:opacity-50"
-                placeholder="you@example.com"
+                className="w-full px-3 py-2 border border-zinc-700 rounded-md bg-zinc-950 text-zinc-50 focus:outline-none focus:ring-2 focus:ring-emerald-500 disabled:opacity-50"
+                placeholder="demo@sentinel.io"
                 required
                 disabled={isLoading}
               />
             </div>
 
             <div className="space-y-2">
-              <label htmlFor="password" className="text-sm font-medium">
+              <label htmlFor="password" className="text-sm font-medium text-zinc-200">
                 Password
               </label>
               <input
                 id="password"
                 type="password"
+                autoComplete="current-password"
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
-                className="w-full px-3 py-2 border border-input rounded-md bg-background focus:outline-none focus:ring-2 focus:ring-ring disabled:cursor-not-allowed disabled:opacity-50"
+                className="w-full px-3 py-2 border border-zinc-700 rounded-md bg-zinc-950 text-zinc-50 focus:outline-none focus:ring-2 focus:ring-emerald-500 disabled:opacity-50"
                 placeholder="••••••••"
                 required
                 disabled={isLoading}
               />
             </div>
 
-            <Button type="submit" className="w-full" disabled={isLoading}>
-              {isLoading ? "Signing in..." : "Sign in"}
+            <Button
+              type="submit"
+              className="w-full bg-emerald-600 hover:bg-emerald-500 text-white"
+              disabled={isLoading}
+            >
+              {isLoading ? "Signing in…" : "Sign in"}
             </Button>
           </form>
 
-          <div className="mt-4 rounded-md border bg-muted/40 p-3 text-sm">
-            <p className="font-medium text-foreground mb-1">Judge demo account</p>
-            <p className="text-muted-foreground text-xs mb-2">
-              Pre-seeded SEV1 incident, AI summary, tasks, timeline, deployments.
+          <div className="mt-5 rounded-md border border-emerald-800/60 bg-emerald-950/40 p-4 text-sm">
+            <p className="font-semibold text-emerald-300 mb-1">Judge demo — one click</p>
+            <p className="text-zinc-400 text-xs mb-3">
+              {DEMO_EMAIL} · {DEMO_PASSWORD}
+              <br />
+              Opens SEV1 war room (AI, timeline, tasks, SLA, comms).
             </p>
             <Button
               type="button"
-              variant="outline"
-              size="sm"
-              className="w-full"
+              className="w-full bg-emerald-500 hover:bg-emerald-400 text-zinc-950 font-semibold"
               disabled={isLoading}
-              onClick={() => {
-                setEmail("demo@sentinel.io");
-                setPassword("Sentinel2026!");
-                setError("");
-              }}
+              onClick={() => void handleDemoLogin()}
             >
-              Fill demo@sentinel.io credentials
+              {isLoading ? "Signing in as demo…" : "▶ Enter as demo@sentinel.io"}
             </Button>
           </div>
 
-          <div className="mt-6 text-center text-sm text-muted-foreground">
-            Don&apos;t have an account?{" "}
-            <Link href="/register" className="text-primary hover:underline font-medium">
+          <div className="mt-6 text-center text-sm text-zinc-500">
+            No account?{" "}
+            <Link href="/register" className="text-emerald-400 hover:underline font-medium">
               Create one
             </Link>
           </div>
@@ -124,7 +152,13 @@ function LoginForm() {
 
 export default function LoginPage() {
   return (
-    <Suspense>
+    <Suspense
+      fallback={
+        <div className="min-h-screen flex items-center justify-center bg-zinc-950 text-zinc-400">
+          Loading login…
+        </div>
+      }
+    >
       <LoginForm />
     </Suspense>
   );
