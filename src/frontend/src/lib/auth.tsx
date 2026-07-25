@@ -85,6 +85,8 @@ function tokenCookieAttrs(): string {
 function persistTokens(accessToken: string, refreshToken: string) {
   localStorage.setItem("access_token", accessToken);
   localStorage.setItem("refresh_token", refreshToken);
+  // Legacy alias still read by a few components (StatusBar/Deployments historically).
+  localStorage.setItem("sentinel_token", accessToken);
   document.cookie = `access_token=${accessToken}; ${tokenCookieAttrs()}`;
   document.cookie = `refresh_token=${refreshToken}; ${tokenCookieAttrs()}`;
 }
@@ -92,6 +94,7 @@ function persistTokens(accessToken: string, refreshToken: string) {
 function clearTokens() {
   localStorage.removeItem("access_token");
   localStorage.removeItem("refresh_token");
+  localStorage.removeItem("sentinel_token");
   document.cookie = "access_token=; path=/; max-age=0; SameSite=Lax";
   document.cookie = "refresh_token=; path=/; max-age=0; SameSite=Lax";
 }
@@ -290,6 +293,7 @@ export async function authenticatedFetch(
       if (refreshed.ok) {
         const data = await refreshed.json();
         localStorage.setItem("access_token", data.access_token);
+        localStorage.setItem("sentinel_token", data.access_token);
         const secure = window.location.protocol === "https:";
         document.cookie = `access_token=${data.access_token}; path=/; max-age=${60 * 60 * 24 * 7}; SameSite=Lax${secure ? "; Secure" : ""}`;
         headers.set("Authorization", `Bearer ${data.access_token}`);

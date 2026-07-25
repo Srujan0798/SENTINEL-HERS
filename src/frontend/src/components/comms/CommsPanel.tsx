@@ -173,25 +173,34 @@ export function CommsPanel({
   const listRef = useRef<HTMLDivElement | null>(null);
   const inputRef = useRef<HTMLTextAreaElement | null>(null);
 
-  // Load channel + initial messages.
+  // Load channel first (auto-creates), then messages. Parallel load races a 404
+  // when the incident has no channel yet (seeded SEV1 before comms hook).
   useEffect(() => {
     if (!open || !incidentId) return;
+    let cancelled = false;
     setError(null);
     setLoading(true);
-    Promise.all([
-      apiGet<Channel>(`/api/incidents/${incidentId}/channel`),
-      apiGet<{ data: Message[]; pagination: Pagination }>(
-        `/api/incidents/${incidentId}/messages?page=1&per_page=50`
-      ),
-    ])
-      .then(([ch, msgs]) => {
+    (async () => {
+      try {
+        const ch = await apiGet<Channel>(`/api/incidents/${incidentId}/channel`);
+        if (cancelled) return;
         setChannel(ch);
+        const msgs = await apiGet<{ data: Message[]; pagination: Pagination }>(
+          `/api/incidents/${incidentId}/messages?page=1&per_page=50`
+        );
+        if (cancelled) return;
         setMessages(msgs.data);
         setPagination(msgs.pagination);
         setPage(1);
-      })
-      .catch((e) => setError(e.message || "Failed to load channel"))
-      .finally(() => setLoading(false));
+      } catch (e) {
+        if (!cancelled) setError(e instanceof Error ? e.message : "Failed to load channel");
+      } finally {
+        if (!cancelled) setLoading(false);
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
   }, [open, incidentId]);
 
   // Load team members for @mention autocomplete.

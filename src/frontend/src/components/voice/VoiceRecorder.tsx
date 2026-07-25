@@ -66,6 +66,19 @@ export function VoiceRecorder({
     mediaRecorderRef.current?.stop();
   }, []);
 
+  const authHeaders = (): Record<string, string> => {
+    if (typeof window === "undefined") return {};
+    const token =
+      localStorage.getItem("access_token") || localStorage.getItem("sentinel_token");
+    return token ? { Authorization: `Bearer ${token}` } : {};
+  };
+
+  const resolvedBase =
+    apiBase ||
+    process.env.NEXT_PUBLIC_API_BASE_URL ||
+    process.env.NEXT_PUBLIC_API_URL ||
+    "http://localhost:8000";
+
   const uploadAudio = async (blob: Blob) => {
     setState("uploading");
     try {
@@ -73,8 +86,8 @@ export function VoiceRecorder({
       form.append("file", blob, "recording.webm");
 
       const res = await fetch(
-        `${apiBase}/api/voice/incidents?team_id=${teamId}&actor=voice`,
-        { method: "POST", body: form }
+        `${resolvedBase}/api/voice/incidents?team_id=${teamId}&actor=voice`,
+        { method: "POST", body: form, headers: authHeaders() }
       );
 
       if (!res.ok) {
@@ -112,10 +125,10 @@ export function VoiceRecorder({
     setError(null);
     try {
       const res = await fetch(
-        `${apiBase}/api/incidents?team_id=${teamId}&actor=voice-text`,
+        `${resolvedBase}/api/incidents?team_id=${teamId}&actor=voice-text`,
         {
           method: "POST",
-          headers: { "Content-Type": "application/json" },
+          headers: { "Content-Type": "application/json", ...authHeaders() },
           body: JSON.stringify({
             title: fallbackTitle.trim() || fallbackText.trim().slice(0, 100),
             description: fallbackText.trim(),

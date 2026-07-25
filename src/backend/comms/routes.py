@@ -97,13 +97,25 @@ async def list_messages(
     db: Session = Depends(get_db),
     current_user: dict = Depends(get_current_user_dependency),
 ):
-    """Paginated message history for an incident channel."""
+    """Paginated message history for an incident channel (auto-creates channel if missing)."""
     team_id = current_user["team_id"]
     svc = CommsService(db)
+    from src.backend.incidents.models import Incident
+
+    inc = db.query(Incident).filter(
+        Incident.id == str(incident_id),
+        Incident.team_id == team_id,
+    ).first()
+    if not inc:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Incident not found")
     try:
-        channel = svc.get_channel_for_incident(str(incident_id), str(team_id))
-    except ChannelNotFound:
-        raise HTTPException(status_code=404, detail="Channel not found for incident")
+        channel = svc.get_or_create_channel_for_incident(
+            incident_id=str(incident_id),
+            team_id=str(team_id),
+            incident_title=str(inc.title),
+        )
+    except Exception as exc:
+        raise HTTPException(status_code=500, detail=f"Channel init failed: {exc}")
     return svc.list_messages(channel_id=str(channel.id), page=page, per_page=per_page)
 
 

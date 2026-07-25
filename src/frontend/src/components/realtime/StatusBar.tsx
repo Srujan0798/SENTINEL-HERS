@@ -19,8 +19,15 @@ export function StatusBar({ teamId }: StatusBarProps) {
       process.env.NEXT_PUBLIC_API_BASE_URL ||
       process.env.NEXT_PUBLIC_API_URL ||
       "http://localhost:8000";
-    const token = typeof window !== "undefined" ? localStorage.getItem("sentinel_token") : null;
-    if (!token) return;
+    const token =
+      typeof window !== "undefined"
+        ? localStorage.getItem("access_token") || localStorage.getItem("sentinel_token")
+        : null;
+    if (!token) {
+      // No session yet — show disconnected rather than spinning forever.
+      setState("disconnected");
+      return;
+    }
 
     const url = `${base}/api/realtime/sse?token=${encodeURIComponent(token)}`;
     const es = new EventSource(url);

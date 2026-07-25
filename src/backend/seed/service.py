@@ -95,6 +95,107 @@ def _get_or_create_demo_user(db: Session, team: TeamModel) -> UserModel:
     return user
 
 
+def _ensure_deployments_and_commits(db: Session, team_id: str, now: datetime | None = None) -> int:
+    """Idempotent demo deployments/commits so the Deployments page is never empty for judges."""
+    try:
+        from src.backend.integrations.github.models import Commit, Deployment
+    except Exception as e:
+        logger.warning("Seed: deployment models unavailable (%s)", e)
+        return 0
+
+    now = now or datetime.now(timezone.utc)
+    existing = db.query(Deployment).filter(Deployment.team_id == team_id).count()
+    if existing > 0:
+        return existing
+
+    specs = [
+        {
+            "service": "payments",
+            "environment": "production",
+            "version": "v2.14.3",
+            "sha": "a1b2c3d4e5f60718293a4b5c6d7e8f901234abcd",
+            "status": "success",
+            "source": "github",
+            "deployed_by": "deploy-bot",
+            "deployed_at": now - timedelta(hours=3),
+            "message": "fix(payments): raise DB pool size after cascade",
+            "author": "sre-bot",
+            "branch": "main",
+        },
+        {
+            "service": "api-gateway",
+            "environment": "production",
+            "version": "v1.9.1",
+            "sha": "b2c3d4e5f60718293a4b5c6d7e8f901234abcde1",
+            "status": "success",
+            "source": "github",
+            "deployed_by": "ci",
+            "deployed_at": now - timedelta(hours=8),
+            "message": "chore(gateway): roll forward rate-limit config",
+            "author": "platform",
+            "branch": "main",
+        },
+        {
+            "service": "redis-cache",
+            "environment": "staging",
+            "version": "v0.4.2",
+            "sha": "c3d4e5f60718293a4b5c6d7e8f901234abcdef12",
+            "status": "failed",
+            "source": "gitlab",
+            "deployed_by": "gitlab-ci",
+            "deployed_at": now - timedelta(hours=1, minutes=20),
+            "message": "feat(cache): eviction policy experiment (reverted)",
+            "author": "cache-team",
+            "branch": "staging",
+        },
+        {
+            "service": "auth",
+            "environment": "production",
+            "version": "v3.2.0",
+            "sha": "d4e5f60718293a4b5c6d7e8f901234abcdef1234",
+            "status": "success",
+            "source": "github",
+            "deployed_by": "deploy-bot",
+            "deployed_at": now - timedelta(days=1),
+            "message": "fix(auth): rollback bad JWT validation config",
+            "author": "auth-oncall",
+            "branch": "main",
+        },
+    ]
+    for s in specs:
+        dep_id = str(uuid.uuid4())
+        db.add(
+            Deployment(
+                id=dep_id,
+                team_id=team_id,
+                service=s["service"],
+                environment=s["environment"],
+                version=s["version"],
+                sha=s["sha"],
+                status=s["status"],
+                source=s["source"],
+                deployed_by=s["deployed_by"],
+                deployed_at=s["deployed_at"],
+            )
+        )
+        db.add(
+            Commit(
+                id=str(uuid.uuid4()),
+                team_id=team_id,
+                deployment_id=dep_id,
+                sha=s["sha"],
+                message=s["message"],
+                author=s["author"],
+                service=s["service"],
+                branch=s["branch"],
+                source=s["source"],
+                committed_at=s["deployed_at"] - timedelta(minutes=12),
+            )
+        )
+    db.flush()
+    return len(specs)
+
+
 def ensure_demo_seed(db: Session) -> dict[str, Any]:
     """Create demo user + SEV1 path if missing. Safe to call on every boot.
 
@@ -149,12 +250,14 @@ def ensure_demo_seed(db: Session) -> dict[str, Any]:
                 )
             )
             existing_count += 1
+        dep_n = _ensure_deployments_and_commits(db, team_id, now)
         db.commit()
         return {
             "status": "skipped",
             "reason": "demo data already present (repaired gaps if any)",
             "team_id": team_id,
             "incident_count": existing_count,
+            "deployment_count": dep_n,
             "demo_email": DEMO_EMAIL,
         }
 
@@ -305,12 +408,15 @@ def ensure_demo_seed(db: Session) -> dict[str, Any]:
     except Exception as e:
         logger.warning("Seed: anomaly scoring skipped (%s)", e)
 
+    dep_n = _ensure_deployments_and_commits(db, team_id, now)
+
     db.commit()
-    logger.info("Demo seed complete team=%s sev1=%s", team_id, inc1.id)
+    logger.info("Demo seed complete team=%s sev1=%s deps=%s", team_id, inc1.id, dep_n)
     return {
         "status": "seeded",
         "team_id": team_id,
         "incident_id": inc1.id,
+        "deployment_count": dep_n,
         "demo_email": DEMO_EMAIL,
     }
 

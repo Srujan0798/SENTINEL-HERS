@@ -46,6 +46,37 @@ export interface Incident {
   updated_at: string;
   resolved_at?: string;
   assigned_to?: string;
+  detected_at?: string;
+  team_id?: string;
+}
+
+export interface TimelineEvent {
+  id: string;
+  incident_id: string;
+  event_type: string;
+  source: string;
+  actor: string;
+  ts: string;
+  description?: string | null;
+}
+
+export interface IncidentTask {
+  id: string;
+  incident_id: string;
+  title: string;
+  status: string;
+  priority: string;
+  assigned_to?: string | null;
+  created_at: string;
+}
+
+export interface SlaStatus {
+  incident_id: string;
+  title: string;
+  severity: string;
+  sla_minutes: number;
+  remaining_minutes: number;
+  breached: boolean;
 }
 
 export interface LogEntry {
