@@ -6,6 +6,7 @@ from typing import Optional
 
 class Role(str, Enum):
     OWNER = "owner"
+    ADMIN = "admin"
     RESPONDER = "responder"
     VIEWER = "viewer"
 

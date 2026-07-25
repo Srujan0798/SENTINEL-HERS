@@ -13,6 +13,7 @@ from sqlalchemy.orm import sessionmaker
 
 sys.path.insert(0, str(Path(__file__).parent.parent.parent))
 
+from src.backend.auth.dependencies import get_current_user_dependency
 from src.backend.incidents.database import Base, get_db
 from src.backend.incidents.models import Incident
 from src.backend.voice import routes as voice_routes
@@ -32,18 +33,23 @@ def override_get_db():
         db.close()
 
 
-app.include_router(voice_routes.router)
 client = TestClient(app)
 
 TEAM_ID = "00000000-0000-0000-0000-000000000001"
+USER_ID = "00000000-0000-0000-0000-000000000099"
 
 
 @pytest.fixture(scope="module", autouse=True)
 def setup_db():
     app.dependency_overrides[get_db] = override_get_db
+    app.dependency_overrides[get_current_user_dependency] = lambda: {
+        "id": USER_ID, "team_id": TEAM_ID, "role": "admin",
+        "email": "demo@test.com", "is_active": True,
+    }
     Base.metadata.create_all(bind=engine)
     yield
     app.dependency_overrides.pop(get_db, None)
+    app.dependency_overrides.pop(get_current_user_dependency, None)
 
 
 def _make_tiny_wav(duration_ms: int = 100, sample_rate: int = 16000) -> bytes:
@@ -62,7 +68,7 @@ def test_voice_upload_creates_incident():
 
     response = client.post(
         "/api/voice/incidents",
-        params={"team_id": TEAM_ID, "actor": "voice-test"},
+        params={"actor": "voice-test"},
         files={"file": ("test.wav", wav_bytes, "audio/wav")},
     )
 
@@ -81,7 +87,7 @@ def test_voice_transcript_in_metadata():
 
     response = client.post(
         "/api/voice/incidents",
-        params={"team_id": TEAM_ID},
+        params={},
         files={"file": ("test.wav", wav_bytes, "audio/wav")},
     )
 
@@ -98,7 +104,7 @@ def test_voice_severity_mapping_sev1():
 
     response = client.post(
         "/api/voice/incidents",
-        params={"team_id": TEAM_ID},
+        params={},
         files={"file": ("test.wav", wav_bytes, "audio/wav")},
     )
 
@@ -110,7 +116,7 @@ def test_voice_severity_mapping_sev1():
 def test_voice_invalid_extension():
     response = client.post(
         "/api/voice/incidents",
-        params={"team_id": TEAM_ID},
+        params={},
         files={"file": ("test.txt", b"not audio", "text/plain")},
     )
 
@@ -121,7 +127,7 @@ def test_voice_invalid_extension():
 def test_voice_empty_file():
     response = client.post(
         "/api/voice/incidents",
-        params={"team_id": TEAM_ID},
+        params={},
         files={"file": ("test.wav", b"", "audio/wav")},
     )
 
@@ -135,7 +141,7 @@ def test_voice_garbage_audio():
 
     response = client.post(
         "/api/voice/incidents",
-        params={"team_id": TEAM_ID},
+        params={},
         files={"file": ("garbage.wav", garbage, "audio/wav")},
     )
 
@@ -157,7 +163,7 @@ def test_voice_affected_services_in_metadata():
 
     response = client.post(
         "/api/voice/incidents",
-        params={"team_id": TEAM_ID},
+        params={},
         files={"file": ("test.wav", wav_bytes, "audio/wav")},
     )
 
@@ -174,7 +180,7 @@ def test_voice_multiple_uploads():
     for _ in range(3):
         resp = client.post(
             "/api/voice/incidents",
-            params={"team_id": TEAM_ID},
+            params={},
             files={"file": ("test.wav", wav_bytes, "audio/wav")},
         )
         assert resp.status_code == 201
@@ -193,7 +199,7 @@ def test_voice_unparseable_transcript_returns_422():
         wav_bytes = _make_tiny_wav()
         response = client.post(
             "/api/voice/incidents",
-            params={"team_id": TEAM_ID},
+            params={},
             files={"file": ("test.wav", wav_bytes, "audio/wav")},
         )
 
@@ -212,7 +218,7 @@ def test_voice_parse_failure_returns_422():
         wav_bytes = _make_tiny_wav()
         response = client.post(
             "/api/voice/incidents",
-            params={"team_id": TEAM_ID},
+            params={},
             files={"file": ("test.wav", wav_bytes, "audio/wav")},
         )
 
@@ -233,7 +239,7 @@ def test_voice_transcription_failure_returns_502():
         wav_bytes = _make_tiny_wav()
         response = client.post(
             "/api/voice/incidents",
-            params={"team_id": TEAM_ID},
+            params={},
             files={"file": ("test.wav", wav_bytes, "audio/wav")},
         )
 
@@ -247,7 +253,7 @@ def test_voice_audio_too_short_rejected():
 
     response = client.post(
         "/api/voice/incidents",
-        params={"team_id": TEAM_ID},
+        params={},
         files={"file": ("tiny.wav", short_audio, "audio/wav")},
     )
 

@@ -1,5 +1,6 @@
 import logging
 import os
+import sys
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
@@ -7,6 +8,20 @@ logging.basicConfig(level=logging.INFO, format="%(asctime)s %(name)s %(levelname
 logger = logging.getLogger(__name__)
 
 app = FastAPI(title="SENTINEL API", version="1.0.0", docs_url="/api/docs", redoc_url="/api/redoc")
+
+# Production AI check: fail boot if AI_PROVIDER is mock or keys missing (unless ALLOW_MOCK_AI=1)
+_is_prod = os.getenv("ENV", "development").lower() in ("production", "prod")
+if _is_prod:
+    _ai_provider = os.getenv("AI_PROVIDER", "mock").lower()
+    _allow_mock = os.getenv("ALLOW_MOCK_AI", "0").lower() in ("1", "true", "yes")
+    if _ai_provider == "mock" and not _allow_mock:
+        logger.error("AI_PROVIDER=mock in production. Set a real provider or ALLOW_MOCK_AI=1 for emergency.")
+        sys.exit(1)
+    _key_map = {"claude": "ANTHROPIC_API_KEY", "gemini": "GEMINI_API_KEY", "openrouter": "OPENROUTER_API_KEY", "nvidia": "NVAPI_KEY"}
+    _needed_key = _key_map.get(_ai_provider)
+    if _needed_key and not os.getenv(_needed_key):
+        logger.error("AI_PROVIDER=%s but %s is not set in production.", _ai_provider, _needed_key)
+        sys.exit(1)
 
 # Run DB migrations + optional demo auto-seed before handling any request
 try:
@@ -103,3 +118,13 @@ app.include_router(seed_router)
 # Realtime SSE + WebSocket (StatusBar / Comms live updates)
 from src.backend.realtime.router import router as realtime_router
 app.include_router(realtime_router, prefix="/api")
+
+# Start health prober as background task if enabled
+if os.getenv("ENABLE_HEALTH_PROBER", "0").lower() in ("1", "true", "yes"):
+    try:
+        from src.backend.health.prober import start_health_prober
+        import asyncio
+        asyncio.create_task(start_health_prober())
+        logger.info("Health prober started (background)")
+    except Exception as e:
+        logger.warning("Health prober not started: %s", e)

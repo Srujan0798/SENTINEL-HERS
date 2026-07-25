@@ -1,0 +1,26 @@
+- generic [active] [ref=e1]:
+  - alert [ref=e2]
+  - generic [ref=e4]:
+    - generic [ref=e5]:
+      - paragraph [ref=e6]: SENTINEL
+      - heading "Mission console" [level=3] [ref=e7]
+      - paragraph [ref=e8]: One workspace for incidents, signal, and AI-assisted response.
+    - generic [ref=e9]:
+      - generic [ref=e10]:
+        - generic [ref=e11]:
+          - text: Email
+          - textbox "Email" [ref=e12]:
+            - /placeholder: demo@sentinel.io
+        - generic [ref=e13]:
+          - text: Password
+          - textbox "Password" [ref=e14]:
+            - /placeholder: ••••••••
+        - button "Sign in" [ref=e15]
+      - generic [ref=e16]:
+        - paragraph [ref=e17]: Judge demo — one click
+        - paragraph [ref=e18]: demo@sentinel.ioSentinel2026!
+        - button "▶ Enter live SEV1 demo" [ref=e19]
+      - generic [ref=e20]:
+        - text: No account?
+        - link "Create one" [ref=e21] [cursor=pointer]:
+          - /url: /register

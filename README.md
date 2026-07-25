@@ -42,22 +42,20 @@ Step-by-step: [docs/PRODUCTION_WALKTHROUGH.md](docs/PRODUCTION_WALKTHROUGH.md).
 
 ## What it does
 
-| Capability | Status |
-|------------|--------|
-| Team auth + JWT + role-based access control | ✅ |
-| Real-time incident dashboard (SEV1–4, triage, assignment, escalation) | ✅ |
-| Centralised log + alert ingestion and search | ✅ |
-| AI incident summaries + ranked root-cause suggestions | ✅ |
-| GitHub / GitLab deployment + commit tracking (signed webhooks) | ✅ |
-| Service health monitoring + Prometheus metrics | ✅ |
-| Per-incident communication channels with @mentions | ✅ |
-| Incident timeline with full event provenance | ✅ |
-| Task assignment, escalation, SLA-aware workflow | ✅ |
-| Analytics: MTTR, incident frequency, top errors, alert trends | ✅ |
+| Capability | Status | Notes |
+|------------|--------|-------|
+| Team auth + JWT + role-based access control | 🟡 PARTIAL | Auth works; RBAC NOT wired on routes |
+| Real-time incident dashboard (SEV1–4, triage, assignment, escalation) | 🔴 IN PROGRESS | SSE 404, no realtime events |
+| Centralised log + alert ingestion and search | 🔴 IN PROGRESS | Endpoints return 404 |
+| AI incident summaries + ranked root-cause suggestions | 🔴 IN PROGRESS | Default mock, summary 404 |
+| GitHub / GitLab deployment + commit tracking (signed webhooks) | 🔴 IN PROGRESS | Webhooks optional, no live data |
+| Service health monitoring + Prometheus metrics | 🟡 PARTIAL | Data exists but unauth |
+| Per-incident communication channels with @mentions | 🔴 IN PROGRESS | SSE 404, no live channel |
+| Incident timeline with full event provenance | 🔴 IN PROGRESS | No timeline events live |
+| Task assignment, escalation, SLA-aware workflow | 🔴 IN PROGRESS | Tasks 404 |
+| Analytics: MTTR, incident frequency, top errors, alert trends | 🔴 IN PROGRESS | Analytics 404 |
 
-**Exceptional / brownie features (code present — wave-10 hardens + proves):**  
-Conversational RAG chatbot · Docker + Kubernetes monitoring · Auto-generated postmortems ·  
-Voice-to-ticket · Predictive anomaly detection (IsolationForest).
+**Honest assessment:** Skeleton exists with ~183 tests. Security holes being patched. ~15-20% win-score today.
 
 ---
 

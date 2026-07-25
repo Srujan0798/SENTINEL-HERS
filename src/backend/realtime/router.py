@@ -118,7 +118,12 @@ async def websocket_endpoint(websocket: WebSocket, token: str = Query(..., descr
                     event_type = msg.get("event_type", "")
                     if event_type == "pong":
                         continue
-                    # Allow clients to send events (e.g. chat messages)
+                    # Only allow specific client-originated event types
+                    allowed_client_events = {"channel:message", "typing", "pong"}
+                    if event_type not in allowed_client_events:
+                        logger.warning("WS client tried to publish disallowed event: %s", event_type)
+                        await websocket.send_json({"event_type": "error", "payload": {"error": f"Event type '{event_type}' not allowed"}})
+                        continue
                     await hub.publish(team_id, event_type, msg.get("payload", {}))
                 except json.JSONDecodeError:
                     logger.warning("Invalid JSON from WS client: %s", raw[:200])

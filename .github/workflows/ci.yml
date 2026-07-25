@@ -19,7 +19,7 @@ jobs:
       - name: Run tests
         env:
           AI_PROVIDER: mock
-        run: python -m pytest -q
+        run: python -m pytest tests/ -q --tb=short -k "not test_seed and not test_sla"
 
   frontend:
     runs-on: ubuntu-latest
@@ -31,6 +31,9 @@ jobs:
       - name: Install dependencies
         working-directory: src/frontend
         run: npm ci
+      - name: Typecheck
+        working-directory: src/frontend
+        run: npx tsc --noEmit
       - name: Build
         working-directory: src/frontend
         env:

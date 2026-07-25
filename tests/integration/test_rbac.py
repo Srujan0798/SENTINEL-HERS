@@ -3,32 +3,33 @@ from uuid import uuid4
 from fastapi import FastAPI, Depends, status
 from fastapi.testclient import TestClient
 
+from src.backend.auth.dependencies import get_current_user_dependency
 from src.backend.rbac.models import Role, UserContext
 from src.backend.rbac.dependencies import require_role, require_permission
 
 
-def make_user(role: Role) -> UserContext:
-    return UserContext(
-        id=uuid4(),
-        team_id=uuid4(),
-        role=role,
-        email=f"{role.value}@test.com",
-        is_active=True,
-    )
+def make_user_dict(role: Role) -> dict:
+    return {
+        "id": str(uuid4()),
+        "team_id": str(uuid4()),
+        "role": role.value,
+        "email": f"{role.value}@test.com",
+        "is_active": True,
+    }
 
 
-OWNER = make_user(Role.OWNER)
-RESPONDER = make_user(Role.RESPONDER)
-VIEWER = make_user(Role.VIEWER)
+OWNER = make_user_dict(Role.OWNER)
+RESPONDER = make_user_dict(Role.RESPONDER)
+VIEWER = make_user_dict(Role.VIEWER)
 
 
-def create_app(current_user: UserContext) -> FastAPI:
+def create_app(current_user: dict) -> FastAPI:
     app = FastAPI()
 
-    async def mock_get_current_user() -> UserContext:
+    async def mock_get_current_user() -> dict:
         return current_user
 
-    app.dependency_overrides[require_role.__globals__["_get_current_user_placeholder"]] = mock_get_current_user
+    app.dependency_overrides[get_current_user_dependency] = mock_get_current_user
 
     @app.get("/read-route")
     async def read_route(user: UserContext = Depends(require_role(Role.OWNER, Role.RESPONDER, Role.VIEWER))):

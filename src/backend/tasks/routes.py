@@ -10,9 +10,20 @@ from sqlalchemy.orm import Session
 
 from src.backend.auth.dependencies import get_current_user_dependency
 from src.backend.db import get_db
+from src.backend.incidents.models import Incident
 from src.backend.tasks.models import Task
 
 router = APIRouter(tags=["tasks", "sla"])
+
+
+def _publish_event(team_id: str, event_type: str, payload: dict) -> None:
+    try:
+        from src.backend.realtime.hub import get_hub
+        import asyncio
+        hub = get_hub()
+        asyncio.create_task(hub.publish(team_id, event_type, payload))
+    except Exception:
+        pass
 
 
 class TaskCreate(BaseModel):
@@ -40,6 +51,12 @@ async def create_task(
     current_user: dict = Depends(get_current_user_dependency),
 ):
     team_id = current_user["team_id"]
+    incident = db.query(Incident).filter(
+        Incident.id == str(incident_id),
+        Incident.team_id == team_id,
+    ).first()
+    if not incident:
+        raise HTTPException(status_code=404, detail="Incident not found in your team")
     task = Task(
         id=str(uuid.uuid4()),
         team_id=team_id,
@@ -52,6 +69,7 @@ async def create_task(
         created_by=current_user["id"],
     )
     db.add(task)
+    _publish_event(team_id, "task.create", {"task_id": task.id, "incident_id": str(incident_id), "title": body.title})
     db.commit()
     db.refresh(task)
     return _task_dict(task)
@@ -89,6 +107,7 @@ async def update_task(
     if body.status == "completed" and not task.completed_at:
         task.completed_at = datetime.utcnow()
 
+    _publish_event(team_id, "task.update", {"task_id": task.id, "status": body.status})
     db.commit()
     db.refresh(task)
     return _task_dict(task)
@@ -117,6 +136,8 @@ async def list_sla_status(
         else:
             remaining = sla_minutes_for(inc.severity)
             breached = False
+        if breached:
+            _publish_event(team_id, "sla.breach", {"incident_id": inc.id, "severity": inc.severity, "remaining_minutes": round(remaining, 1)})
         result.append({
             "incident_id": inc.id,
             "title": inc.title,

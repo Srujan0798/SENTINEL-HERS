@@ -8,9 +8,11 @@ from uuid import UUID
 from fastapi import APIRouter, Depends, File, HTTPException, Query, UploadFile, status
 from sqlalchemy.orm import Session
 
+from src.backend.auth.dependencies import get_current_user_dependency
 from src.backend.incidents.database import get_db
 from src.backend.incidents.enums import SeverityLevel
 from src.backend.incidents.service import IncidentService
+from src.backend.rbac.dependencies import require_permission
 
 from .parse import parse_voice_to_incident
 from .transcribe import get_transcriber
@@ -26,9 +28,10 @@ MAX_AUDIO_SIZE = 60 * 1024 * 1024
 @router.post("/incidents", status_code=status.HTTP_201_CREATED)
 async def voice_to_incident(
     file: UploadFile = File(...),
-    team_id: UUID = Query(...),
     actor: str = Query("voice"),
     db: Session = Depends(get_db),
+    current_user: dict = Depends(get_current_user_dependency),
+    _rbac=Depends(require_permission("incidents:create")),
 ):
     """Accept audio upload, transcribe, parse, and create incident."""
     # Validate file extension
@@ -108,7 +111,7 @@ async def voice_to_incident(
     svc = IncidentService(db)
     try:
         result = svc.create_incident(
-            team_id=team_id,
+            team_id=current_user["team_id"],
             title=parsed.title,
             severity=severity,
             description=parsed.description,

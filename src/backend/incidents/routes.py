@@ -5,12 +5,14 @@ from fastapi import APIRouter, Depends, HTTPException, Query, status
 from sqlalchemy.orm import Session
 
 from src.backend.auth.dependencies import get_current_user_dependency
+from src.backend.rbac.dependencies import require_permission
 
 from .database import get_db
 from .enums import IncidentStatus, InvalidStateTransition, SeverityLevel
 
 from .schemas import (
     AssignRequest,
+    EscalateRequest,
     IncidentCreate,
     IncidentListResponse,
     IncidentResponse,
@@ -30,6 +32,7 @@ async def create_incident(
     actor: str = Query("system"),
     db: Session = Depends(get_db),
     current_user: dict = Depends(get_current_user_dependency),
+    _rbac=Depends(require_permission("incidents:create")),
 ):
     svc = IncidentService(db)
     result = svc.create_incident(
@@ -85,6 +88,7 @@ async def update_incident(
     actor: str = Query("system"),
     db: Session = Depends(get_db),
     current_user: dict = Depends(get_current_user_dependency),
+    _rbac=Depends(require_permission("incidents:update")),
 ):
     svc = IncidentService(db)
     updates = body.model_dump(exclude_unset=True)
@@ -103,10 +107,29 @@ async def assign_incident(
     actor: str = Query("system"),
     db: Session = Depends(get_db),
     current_user: dict = Depends(get_current_user_dependency),
+    _rbac=Depends(require_permission("incidents:assign")),
 ):
     svc = IncidentService(db)
     try:
         return svc.assign_incident(incident_id, current_user["team_id"], body.user_id, actor=actor)
+    except IncidentNotFound:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Incident not found")
+
+
+@router.post("/{incident_id}/escalate", response_model=IncidentResponse)
+async def escalate_incident(
+    incident_id: UUID,
+    body: EscalateRequest,
+    actor: str = Query("system"),
+    db: Session = Depends(get_db),
+    current_user: dict = Depends(get_current_user_dependency),
+    _rbac=Depends(require_permission("incidents:update")),
+):
+    svc = IncidentService(db)
+    try:
+        return svc.escalate_incident(
+            incident_id, current_user["team_id"], body.user_id, actor=actor, reason=body.reason
+        )
     except IncidentNotFound:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Incident not found")
 
@@ -132,6 +155,7 @@ async def add_timeline_event(
     actor: str = Query("system"),
     db: Session = Depends(get_db),
     current_user: dict = Depends(get_current_user_dependency),
+    _rbac=Depends(require_permission("incidents:update")),
 ):
     svc = IncidentService(db)
     try:

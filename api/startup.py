@@ -34,7 +34,38 @@ def run_migrations() -> None:
             session.commit()
             logger.info("Default roles seeded")
 
+    # Create performance indexes (idempotent — IF NOT EXISTS)
+    _ensure_indexes(engine)
+
     logger.info("DB migrations complete — %d tables", len(Base.metadata.tables))
+
+def _ensure_indexes(engine) -> None:
+    """Create performance indexes idempotently (IF NOT EXISTS)."""
+    from sqlalchemy import text
+    indexes = [
+        "CREATE INDEX IF NOT EXISTS idx_incidents_team_id ON incidents(team_id)",
+        "CREATE INDEX IF NOT EXISTS idx_incidents_status ON incidents(status)",
+        "CREATE INDEX IF NOT EXISTS idx_incidents_severity ON incidents(severity)",
+        "CREATE INDEX IF NOT EXISTS idx_incidents_detected_at ON incidents(detected_at)",
+        "CREATE INDEX IF NOT EXISTS idx_tasks_team_id ON tasks(team_id)",
+        "CREATE INDEX IF NOT EXISTS idx_tasks_incident_id ON tasks(incident_id)",
+        "CREATE INDEX IF NOT EXISTS idx_timeline_events_incident_id ON timeline_events(incident_id)",
+        "CREATE INDEX IF NOT EXISTS idx_log_entries_team_id ON log_entries(team_id)",
+        "CREATE INDEX IF NOT EXISTS idx_log_entries_level ON log_entries(level)",
+        "CREATE INDEX IF NOT EXISTS idx_log_entries_created_at ON log_entries(created_at)",
+        "CREATE INDEX IF NOT EXISTS idx_alerts_team_id ON alerts(team_id)",
+        "CREATE INDEX IF NOT EXISTS idx_service_health_team_id ON service_health(team_id)",
+        "CREATE INDEX IF NOT EXISTS idx_deployments_team_id ON deployments(team_id)",
+        "CREATE INDEX IF NOT EXISTS idx_deployments_deployed_at ON deployments(deployed_at)",
+    ]
+    with engine.connect() as conn:
+        for stmt in indexes:
+            try:
+                conn.execute(text(stmt))
+            except Exception as e:
+                logger.warning("Index creation skipped (%s): %s", stmt[:60], e)
+        conn.commit()
+    logger.info("Performance indexes ensured (%d statements)", len(indexes))
 
     # Ensure judge demo path exists after every boot (idempotent).
     try:

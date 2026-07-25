@@ -10,6 +10,7 @@ from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy import text
 from sqlalchemy.orm import Session
 
+from src.backend.auth.dependencies import get_current_user_dependency
 from src.backend.db import get_db
 from .models import HealthStatus, ServiceHealthCreate, ServiceHealthResponse
 
@@ -50,7 +51,10 @@ def _as_meta(val: Any) -> dict:
 
 
 @router.get("/", response_model=List[ServiceHealthResponse])
-async def list_services(db: Session = Depends(get_db)):
+async def list_services(
+    db: Session = Depends(get_db),
+    current_user: dict = Depends(get_current_user_dependency),
+):
     """List all services with current status.
 
     Soft-fails to [] on any schema/row issue so Monitoring never 500s for judges.
@@ -62,9 +66,11 @@ async def list_services(db: Session = Depends(get_db)):
                 SELECT id, team_id, service_name, status, uptime_percentage, latency_ms,
                        last_check_at, next_check_at, metadata
                 FROM service_health
+                WHERE team_id = :team_id
                 ORDER BY service_name
                 """
-            )
+            ),
+            {"team_id": str(current_user["team_id"])},
         )
         rows = result.fetchall()
     except Exception as e:
@@ -101,7 +107,11 @@ async def list_services(db: Session = Depends(get_db)):
 
 
 @router.post("/", response_model=ServiceHealthResponse, status_code=status.HTTP_201_CREATED)
-async def register_service(service: ServiceHealthCreate, db: Session = Depends(get_db)):
+async def register_service(
+    service: ServiceHealthCreate,
+    db: Session = Depends(get_db),
+    current_user: dict = Depends(get_current_user_dependency),
+):
     """Register a service for monitoring."""
     try:
         result = db.execute(
@@ -114,7 +124,7 @@ async def register_service(service: ServiceHealthCreate, db: Session = Depends(g
                 """
             ),
             {
-                "team_id": str(service.team_id),
+                "team_id": str(current_user["team_id"]),
                 "service_name": service.service_name,
                 "metadata": service.metadata or {},
             },
@@ -136,6 +146,14 @@ async def register_service(service: ServiceHealthCreate, db: Session = Depends(g
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail="Failed to register service",
         )
+
+    try:
+        from src.backend.realtime.hub import get_hub
+        import asyncio
+        hub = get_hub()
+        asyncio.create_task(hub.publish(str(current_user["team_id"]), "health.change", {"action": "register", "service_name": service.service_name}))
+    except Exception:
+        pass
 
     m = row._mapping if hasattr(row, "_mapping") else None
     get = (lambda k, default=None: m[k] if m is not None else getattr(row, k, default))

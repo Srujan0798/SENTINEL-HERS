@@ -1,10 +1,14 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useState } from "react";
+import { useSearchParams, useRouter } from "next/navigation";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogDescription } from "@/components/ui/dialog";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Textarea } from "@/components/ui/textarea";
 import {
   api,
   type Incident,
@@ -59,6 +63,8 @@ function formatSla(remaining: number, breached: boolean): string {
 
 export default function IncidentsPage() {
   const user = useUser();
+  const searchParams = useSearchParams();
+  const router = useRouter();
   const [incidents, setIncidents] = useState<Incident[]>([]);
   const [selected, setSelected] = useState<Incident | null>(null);
   const [aiSummary, setAiSummary] = useState<string | null>(null);
@@ -74,6 +80,14 @@ export default function IncidentsPage() {
   const [actionBusy, setActionBusy] = useState(false);
   const [actionError, setActionError] = useState<string | null>(null);
   const [showVoice, setShowVoice] = useState(false);
+  const [rcaResult, setRcaResult] = useState<string | null>(null);
+  const [rcaLoading, setRcaLoading] = useState(false);
+  const [escalateOpen, setEscalateOpen] = useState(false);
+  const [escalateReason, setEscalateReason] = useState("");
+  const [escalateBusy, setEscalateBusy] = useState(false);
+  const [createTaskOpen, setCreateTaskOpen] = useState(false);
+  const [newTaskTitle, setNewTaskTitle] = useState("");
+  const [newTaskDescription, setNewTaskDescription] = useState("");
 
   const refreshIncidents = useCallback(async () => {
     const res = await api.get<{ data: Incident[] }>("/api/incidents?per_page=50");
@@ -120,21 +134,23 @@ export default function IncidentsPage() {
     [loadWarRoom]
   );
 
-  // Demo path: auto-open open SEV1 (or first incident) so judges land in the war room.
+  // Deep link from URL ?id=xxx or auto-open open SEV1.
   useEffect(() => {
     let cancelled = false;
     (async () => {
       try {
         const list = await refreshIncidents();
         if (cancelled) return;
-        const sev1 =
-          list.find(
-            (i) =>
-              i.severity === "SEV1" && i.status !== "resolved" && i.status !== "closed"
-          ) ||
-          list.find((i) => i.severity === "SEV1") ||
-          list[0];
-        if (sev1) await loadSummary(sev1);
+        const deepId = searchParams.get("id");
+        const target = deepId
+          ? list.find((i) => i.id === deepId)
+          : list.find(
+              (i) =>
+                i.severity === "SEV1" && i.status !== "resolved" && i.status !== "closed"
+            ) ||
+            list.find((i) => i.severity === "SEV1") ||
+            list[0];
+        if (target) await loadSummary(target);
       } finally {
         if (!cancelled) setLoading(false);
       }
@@ -142,7 +158,7 @@ export default function IncidentsPage() {
     return () => {
       cancelled = true;
     };
-  }, [refreshIncidents, loadSummary]);
+  }, [refreshIncidents, loadSummary, searchParams]);
 
   // Live SLA countdown (1s tick) for the selected incident badge.
   // Depend only on incident_id so the interval is not reset every tick.
@@ -236,6 +252,34 @@ export default function IncidentsPage() {
     }
   }
 
+  async function escalateIncident(userId: string, reason: string) {
+    if (!selected) return;
+    setEscalateBusy(true);
+    try {
+      await api.post(`/api/incidents/${selected.id}/escalate`, { user_id: userId, reason });
+      setEscalateOpen(false);
+      setEscalateReason("");
+      await loadWarRoom(selected);
+    } catch (e) {
+      setActionError(e instanceof Error ? e.message : "Escalate failed");
+    } finally {
+      setEscalateBusy(false);
+    }
+  }
+
+  async function createTask(title: string, description: string) {
+    if (!selected || !title.trim()) return;
+    try {
+      await api.post(`/api/incidents/${selected.id}/tasks`, { title, description });
+      setCreateTaskOpen(false);
+      setNewTaskTitle("");
+      setNewTaskDescription("");
+      await loadWarRoom(selected);
+    } catch (e) {
+      setActionError(e instanceof Error ? e.message : "Create task failed");
+    }
+  }
+
   async function toggleTask(task: IncidentTask) {
     const next = task.status === "completed" ? "open" : "completed";
     try {
@@ -291,7 +335,10 @@ export default function IncidentsPage() {
               className={`cursor-pointer transition-all hover:ring-2 hover:ring-primary ${
                 selected?.id === inc.id ? "ring-2 ring-primary" : ""
               }`}
-              onClick={() => loadSummary(inc)}
+              onClick={() => {
+                loadSummary(inc);
+                router.replace(`/incidents?id=${inc.id}`, { scroll: false });
+              }}
             >
               <CardContent className="py-4">
                 <div className="flex items-start justify-between gap-3">
@@ -376,6 +423,7 @@ export default function IncidentsPage() {
                   {actionError && <p className="text-xs text-destructive">{actionError}</p>}
                 </div>
 
+                {/* AI Summary */}
                 <div>
                   <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-1">
                     AI Summary
@@ -387,6 +435,18 @@ export default function IncidentsPage() {
                   )}
                 </div>
 
+                {/* RCA (separate from summary) */}
+                <div>
+                  <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-1">
+                    Root Cause Analysis
+                  </p>
+                  {rcaLoading ? (
+                    <p className="text-sm text-muted-foreground animate-pulse">Analyzing root causes…</p>
+                  ) : (
+                    <p className="text-sm whitespace-pre-wrap">{rcaResult || "Press Analyze to generate hypotheses."}</p>
+                  )}
+                </div>
+
                 <div className="space-y-2">
                   <Button variant="outline" size="sm" className="w-full" onClick={() => loadSummary(selected)}>
                     Refresh Summary
@@ -395,7 +455,10 @@ export default function IncidentsPage() {
                     variant="outline"
                     size="sm"
                     className="w-full"
+                    disabled={rcaLoading}
                     onClick={async () => {
+                      setRcaLoading(true);
+                      setRcaResult(null);
                       try {
                         type RootCauseRow = {
                           hypothesis?: string;
@@ -409,7 +472,7 @@ export default function IncidentsPage() {
                         }>(`/api/ai/incidents/${selected.id}/root-causes`, {});
                         const rows: RootCauseRow[] = res.root_causes || res.suggestions || [];
                         if (!rows.length) {
-                          setAiSummary("No root-cause hypotheses returned.");
+                          setRcaResult("No root-cause hypotheses returned.");
                           return;
                         }
                         const causes = rows
@@ -420,13 +483,15 @@ export default function IncidentsPage() {
                             return `• ${label} (${pct}%)${action}`;
                           })
                           .join("\n");
-                        setAiSummary(`Root Causes:\n${causes}`);
+                        setRcaResult(causes);
                       } catch {
-                        setAiSummary("Root cause analysis failed.");
+                        setRcaResult("Root cause analysis failed.");
+                      } finally {
+                        setRcaLoading(false);
                       }
                     }}
                   >
-                    Root Cause Analysis
+                    Analyze Root Causes
                   </Button>
                   <Dialog open={postmortemOpen} onOpenChange={setPostmortemOpen}>
                     <DialogTrigger asChild>
@@ -448,6 +513,39 @@ export default function IncidentsPage() {
                           </Button>
                         </div>
                       )}
+                    </DialogContent>
+                  </Dialog>
+                  {/* Escalate button */}
+                  <Dialog open={escalateOpen} onOpenChange={setEscalateOpen}>
+                    <DialogTrigger asChild>
+                      <Button variant="default" size="sm" className="w-full" disabled={!user?.id}>
+                        Escalate Incident
+                      </Button>
+                    </DialogTrigger>
+                    <DialogContent>
+                      <DialogHeader>
+                        <DialogTitle>Escalate Incident</DialogTitle>
+                        <DialogDescription>Escalate to a senior responder with an optional reason.</DialogDescription>
+                      </DialogHeader>
+                      <div className="space-y-3 py-2">
+                        <div>
+                          <Label htmlFor="reason">Reason (optional)</Label>
+                          <Textarea
+                            id="reason"
+                            placeholder="Why is this being escalated?"
+                            value={escalateReason}
+                            onChange={(e) => setEscalateReason(e.target.value)}
+                          />
+                        </div>
+                        <Button
+                          variant="default"
+                          className="w-full"
+                          disabled={escalateBusy || !user?.id}
+                          onClick={() => user?.id && escalateIncident(user.id, escalateReason)}
+                        >
+                          {escalateBusy ? "Escalating…" : "Confirm Escalation"}
+                        </Button>
+                      </div>
                     </DialogContent>
                   </Dialog>
                 </div>
@@ -484,7 +582,7 @@ export default function IncidentsPage() {
                     {tasks.length === 0 ? (
                       <p className="text-xs text-muted-foreground">No tasks for this incident.</p>
                     ) : (
-                      <ul className="space-y-1.5 max-h-48 overflow-y-auto">
+                      <ul className="space-y-1.5 max-h-40 overflow-y-auto mb-2">
                         {tasks.map((t) => (
                           <li key={t.id} className="flex items-start gap-2 text-sm">
                             <input
@@ -503,6 +601,48 @@ export default function IncidentsPage() {
                         ))}
                       </ul>
                     )}
+                    {/* Create Task button */}
+                    <Dialog open={createTaskOpen} onOpenChange={setCreateTaskOpen}>
+                      <DialogTrigger asChild>
+                        <Button variant="outline" size="sm" className="w-full">
+                          + Add Task
+                        </Button>
+                      </DialogTrigger>
+                      <DialogContent>
+                        <DialogHeader>
+                          <DialogTitle>Create Task</DialogTitle>
+                          <DialogDescription>Add a new task for this incident.</DialogDescription>
+                        </DialogHeader>
+                        <div className="space-y-3 py-2">
+                          <div>
+                            <Label htmlFor="taskTitle">Title</Label>
+                            <Input
+                              id="taskTitle"
+                              placeholder="Investigate payment DB pool"
+                              value={newTaskTitle}
+                              onChange={(e) => setNewTaskTitle(e.target.value)}
+                            />
+                          </div>
+                          <div>
+                            <Label htmlFor="taskDesc">Description (optional)</Label>
+                            <Textarea
+                              id="taskDesc"
+                              placeholder="Details about this task"
+                              value={newTaskDescription}
+                              onChange={(e) => setNewTaskDescription(e.target.value)}
+                            />
+                          </div>
+                          <Button
+                            variant="default"
+                            className="w-full"
+                            disabled={!newTaskTitle.trim()}
+                            onClick={() => createTask(newTaskTitle, newTaskDescription)}
+                          >
+                            Create Task
+                          </Button>
+                        </div>
+                      </DialogContent>
+                    </Dialog>
                   </div>
                 </div>
               </CardContent>

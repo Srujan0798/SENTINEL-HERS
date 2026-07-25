@@ -54,6 +54,16 @@ def _serialize_timeline_event(ev: TimelineEvent) -> dict[str, Any]:
     }
 
 
+def _publish_event(team_id: str, event_type: str, payload: dict[str, Any]) -> None:
+    try:
+        from src.backend.realtime.hub import get_hub
+        import asyncio
+        hub = get_hub()
+        asyncio.create_task(hub.publish(team_id, event_type, payload))
+    except Exception:
+        pass
+
+
 def _emit_timeline_event(
     db: Session,
     incident_id: str,
@@ -110,6 +120,7 @@ class IncidentService:
             actor=actor,
             description=f"Incident created with severity {severity.value}",
         )
+        _publish_event(str(team_id), "incident.create", {"incident_id": inc.id, "severity": severity.value, "status": IncidentStatus.DETECTED.value})
         self.db.commit()
         self.db.refresh(inc)
         return _serialize_incident(inc)
@@ -204,6 +215,7 @@ class IncidentService:
                 description=f"Status changed from {old_status.value} to {target_status.value}",
                 metadata={"old_status": old_status.value, "new_status": target_status.value},
             )
+            _publish_event(str(team_id), "incident.update", {"incident_id": inc.id, "status": target_status.value, "old_status": old_status.value})
 
         for field in ("title", "description", "root_cause"):
             if field in updates and updates[field] is not None:
@@ -222,6 +234,37 @@ class IncidentService:
         if "metadata" in updates and updates["metadata"] is not None:
             inc.metadata_ = updates["metadata"]
 
+        self.db.flush()
+        self.db.commit()
+        self.db.refresh(inc)
+        return _serialize_incident(inc)
+
+    def escalate_incident(
+        self,
+        incident_id: UUID,
+        team_id: UUID,
+        escalate_to: UUID,
+        actor: str = "system",
+        reason: str | None = None,
+    ) -> dict[str, Any]:
+        inc = (
+            self.db.query(Incident)
+            .filter(Incident.id == str(incident_id), Incident.team_id == str(team_id))
+            .first()
+        )
+        if not inc:
+            raise IncidentNotFound(f"Incident {incident_id} not found")
+        inc.escalated_to = str(escalate_to)
+        _emit_timeline_event(
+            db=self.db,
+            incident_id=inc.id,
+            event_type="incident.escalated",
+            source="api",
+            actor=actor,
+            description=f"Incident escalated to user {escalate_to}" + (f": {reason}" if reason else ""),
+            metadata={"escalated_to": str(escalate_to), "reason": reason},
+        )
+        _publish_event(str(team_id), "incident.escalate", {"incident_id": inc.id, "escalated_to": str(escalate_to), "reason": reason})
         self.db.flush()
         self.db.commit()
         self.db.refresh(inc)
@@ -253,6 +296,7 @@ class IncidentService:
             description=f"Incident assigned to user {user_id}",
             metadata={"assigned_to": str(user_id)},
         )
+        _publish_event(str(team_id), "incident.assign", {"incident_id": inc.id, "assigned_to": str(user_id)})
         self.db.flush()
         self.db.commit()
         self.db.refresh(inc)

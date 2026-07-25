@@ -149,11 +149,11 @@ export default function DashboardPage() {
               incidents.slice(0, 5).map((inc) => {
                 const sla = slaRows.find((s) => s.incident_id === inc.id);
                 return (
-                  <Link
-                    key={inc.id}
-                    href="/incidents"
-                    className="flex items-center justify-between p-4 border rounded-lg hover:ring-2 hover:ring-primary transition-all"
-                  >
+                    <Link
+                      key={inc.id}
+                      href={`/incidents?id=${inc.id}`}
+                      className="flex items-center justify-between p-4 border rounded-lg hover:ring-2 hover:ring-primary transition-all"
+                    >
                     <div className="min-w-0">
                       <p className="font-medium truncate">{inc.title}</p>
                       <p className="text-sm text-muted-foreground">

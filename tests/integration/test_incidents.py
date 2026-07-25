@@ -43,7 +43,7 @@ def setup_db():
 @pytest.fixture(autouse=True, scope="module")
 def override_auth():
     async def fake_user():
-        return {"user_id": USER_ID, "team_id": TEAM_ID, "role_id": "00000000-0000-0000-0000-000000000001"}
+        return {"id": USER_ID, "team_id": TEAM_ID, "role": "admin", "email": "test@test.com", "is_active": True}
     app.dependency_overrides[get_current_user_dependency] = fake_user
     yield
     app.dependency_overrides.pop(get_current_user_dependency, None)

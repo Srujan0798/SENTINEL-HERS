@@ -29,6 +29,11 @@ class AssignRequest(BaseModel):
     user_id: UUID
 
 
+class EscalateRequest(BaseModel):
+    user_id: UUID
+    reason: Optional[str] = None
+
+
 class IncidentResponse(BaseModel):
     id: UUID
     team_id: UUID

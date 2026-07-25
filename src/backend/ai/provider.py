@@ -202,8 +202,13 @@ def get_provider() -> AIProvider:
 
     If the chosen live provider's key is absent, fall back to mock but log a
     clear WARNING (fail safe + loud, never a silent mask).
+    In production, boot fails if mock is used without ALLOW_MOCK_AI=1.
     """
+    _is_prod = os.getenv("ENV", "development").lower() in ("production", "prod")
+    _allow_mock = os.getenv("ALLOW_MOCK_AI", "0").lower() in ("1", "true", "yes")
     provider = os.getenv("AI_PROVIDER", "mock").lower()
+    if provider == "mock" and _is_prod and not _allow_mock:
+        raise AIProviderError("AI_PROVIDER=mock in production. Set a real provider or ALLOW_MOCK_AI=1.")
     if provider == "claude":
         if not os.getenv("ANTHROPIC_API_KEY"):
             return _fallback_to_mock("claude", "ANTHROPIC_API_KEY")

@@ -21,7 +21,10 @@ router = APIRouter(prefix="/api/integrations", tags=["integrations"])
 
 def _verify_github_sig(body: bytes, sig_header: str | None) -> None:
     secret = os.getenv("GITHUB_WEBHOOK_SECRET", "")
+    is_prod = os.getenv("ENV", "development").lower() in ("production", "prod")
     if not secret:
+        if is_prod:
+            raise HTTPException(status_code=401, detail="GITHUB_WEBHOOK_SECRET not configured")
         return  # skip in dev/test
     if not sig_header or not sig_header.startswith("sha256="):
         raise HTTPException(status_code=401, detail="Missing GitHub signature")
@@ -124,7 +127,11 @@ async def gitlab_webhook(
     db: Session = Depends(get_db),
 ):
     expected = os.getenv("GITLAB_WEBHOOK_SECRET", "")
-    if expected and x_gitlab_token != expected:
+    is_prod = os.getenv("ENV", "development").lower() in ("production", "prod")
+    if not expected:
+        if is_prod:
+            raise HTTPException(status_code=401, detail="GITLAB_WEBHOOK_SECRET not configured")
+    elif x_gitlab_token != expected:
         raise HTTPException(status_code=401, detail="Invalid GitLab token")
 
     try:

@@ -20,10 +20,12 @@ from src.backend.shared_models import RoleModel, TeamModel, UserModel
 
 _jwt = os.getenv("JWT_SECRET")
 _jwt_refresh = os.getenv("JWT_REFRESH_SECRET")
+_is_prod = os.getenv("ENV", "development").lower() in ("production", "prod")
 if not _jwt or not _jwt_refresh:
-    if os.getenv("DATABASE_URL"):
+    env_source = os.getenv("DATABASE_URL")
+    if _is_prod or env_source:
         raise RuntimeError(
-            "JWT_SECRET and JWT_REFRESH_SECRET must be set when DATABASE_URL is configured."
+            "JWT_SECRET and JWT_REFRESH_SECRET must be set in production."
         )
     _jwt = "dev-jwt-secret-do-not-use-in-prod"
     _jwt_refresh = "dev-jwt-refresh-secret-do-not-use-in-prod"

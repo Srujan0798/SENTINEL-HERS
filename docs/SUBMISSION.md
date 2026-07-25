@@ -21,34 +21,20 @@
 
 ## What is the progress till now? *
 
-SENTINEL is functionally complete end-to-end. All 10 core functional requirements are
-implemented and tested, plus all 5 "exceptional" features.
+**HONEST ASSESSMENT:** SENTINEL has a scaffold with modules and ~183 passing tests, but is NOT yet a winning Hard-track product. Current win-score: ~15-20%.
 
-**Backend (FastAPI, 16 modules, 47 endpoints, 183 tests passing):**
-- Team-based auth + JWT (access/refresh) with RBAC
-- Incident lifecycle: severity (SEV1–4), status transitions, triage, assignment, escalation
-- Centralised log + alert ingestion and search
-- AI incident summaries, ranked root-cause suggestions, RAG chatbot, auto-postmortems
-  (pluggable provider: Claude / Gemini / deterministic mock)
-- GitHub + GitLab webhooks (HMAC/token-verified) for deployment + commit tracking
-- Service health monitoring + Prometheus `/metrics`
-- Per-incident comms channels with @mentions and realtime fan-out
-- Incident timeline with full event provenance
-- Task assignment, escalation, SLA engine (SEV-based deadlines)
-- Analytics: MTTR, incidents-by-severity, top errors, alert trends
-- ML anomaly detection (IsolationForest pipeline)
-- Docker + Kubernetes container monitoring (graceful fallback)
-- Voice-to-ticket (speech → incident)
+**What works (live):** /healthz, /auth/login, /api/demo-status, frontend renders login page.
 
-**Frontend (Next.js 15 + React 19 + Tailwind/shadcn):** login/register, live dashboard
-with KPIs, incidents view with AI panel + embedded RAG chat, monitoring (alerts +
-containers), analytics, deployments. Realtime SSE status indicator.
+**Critical gaps (must fix before judges see it):**
+- Voice endpoint accepts unauth input (client-supplied team_id, no 401)
+- Health services return data without authentication (cross-tenant leak)
+- RBAC policy exists but NOT wired on any route
+- AI summary endpoint 404 (mock provider, not live)
+- SSE endpoint 404 (no realtime events)
+- Tasks, Deployments, Timeline, Analytics all 404
+- Most data endpoints not returning live data
 
-**DevOps:** Docker Compose (postgres, redis, api, frontend, prometheus, grafana — all
-health-checked), Prometheus alert rules, Grafana dashboard auto-provisioned, one-command
-seed script for the demo path.
-
-Status: **185+ tests green; live FE+API; demo seeded (SEV1+MTTR).** Optional: demo Loom video.
+**Status: ~40 endpoints exist in code, security holes being patched, live AI + realtime being activated.**
 
 ---
 

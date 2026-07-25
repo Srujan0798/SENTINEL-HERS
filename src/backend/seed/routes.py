@@ -54,6 +54,7 @@ async def demo_status(db: Session = Depends(get_db)):
     )
     # Ready only when an *open* SEV1 exists for the sacred war-room demo path.
     ready = bool(user and incidents >= 1 and open_sev1 >= 1)
+    is_prod = os.getenv("ENV", "development").lower() in ("production", "prod")
     return {
         "ready": ready,
         "demo_email": DEMO_EMAIL,
@@ -62,7 +63,7 @@ async def demo_status(db: Session = Depends(get_db)):
         "open_sev1_count": open_sev1,
         "resolved_count": resolved,
         "frontend": "https://sentinel-hers.vercel.app",
-        "login_hint": "demo@sentinel.io / Sentinel2026!",
+        **({"login_hint": "demo@sentinel.io / Sentinel2026!"} if not is_prod else {} ),
         **(
             {}
             if ready
