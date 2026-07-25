@@ -1,0 +1,21 @@
+- generic [active] [ref=f2e1]:
+  - alert [ref=f2e2]
+  - generic [ref=f2e4]:
+    - generic [ref=f2e5]:
+      - heading "Sign in to SENTINEL" [level=3] [ref=f2e6]
+      - paragraph [ref=f2e7]: Enter your credentials to access the dashboard
+    - generic [ref=f2e8]:
+      - generic [ref=f2e9]:
+        - generic [ref=f2e10]:
+          - text: Email
+          - textbox "Email" [ref=f2e11]:
+            - /placeholder: you@example.com
+        - generic [ref=f2e12]:
+          - text: Password
+          - textbox "Password" [ref=f2e13]:
+            - /placeholder: ••••••••
+        - button "Sign in" [ref=f2e14]
+      - generic [ref=f2e15]:
+        - text: Don't have an account?
+        - link "Create one" [ref=f2e16] [cursor=pointer]:
+          - /url: /register

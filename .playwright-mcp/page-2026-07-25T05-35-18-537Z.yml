@@ -1,0 +1,66 @@
+- generic [active] [ref=f3e1]:
+  - alert [ref=f3e2]
+  - generic [ref=f3e3]:
+    - banner [ref=f3e4]:
+      - generic [ref=f3e5]:
+        - link "SENTINEL" [ref=f3e6] [cursor=pointer]:
+          - /url: /dashboard
+        - navigation [ref=f3e7]:
+          - list
+          - generic [ref=f3e8]:
+            - generic [ref=f3e9]: connecting
+            - generic [ref=f3e12]: Demo User ()
+            - button "Log out" [ref=f3e13]
+    - main [ref=f3e14]:
+      - generic [ref=f3e15]:
+        - generic [ref=f3e16]:
+          - heading "Incidents" [level=1] [ref=f3e17]
+          - paragraph [ref=f3e18]: 3 total incidents
+        - generic [ref=f3e19]:
+          - generic [ref=f3e20]:
+            - generic [ref=f3e23] [cursor=pointer]:
+              - generic [ref=f3e24]:
+                - paragraph [ref=f3e25]: Payment service cascade failure
+                - paragraph [ref=f3e26]: Payment service is returning 503s due to database connection pool exhaustion. Error rate at 78%, p99 latency > 5s. Revenue impact estimated at $12k/min.
+                - paragraph [ref=f3e27]: 25/07/2026, 05:32:59
+              - generic [ref=f3e28]:
+                - generic [ref=f3e29]: SEV1
+                - generic [ref=f3e30]: investigating
+            - generic [ref=f3e33] [cursor=pointer]:
+              - generic [ref=f3e34]:
+                - paragraph [ref=f3e35]: Redis cache miss rate spike
+                - paragraph [ref=f3e36]: Cache miss ratio jumped from 5% to 94% after last deployment. Causing increased database load across all services.
+                - paragraph [ref=f3e37]: 25/07/2026, 05:32:59
+              - generic [ref=f3e38]:
+                - generic [ref=f3e39]: SEV2
+                - generic [ref=f3e40]: triaging
+            - generic [ref=f3e43] [cursor=pointer]:
+              - generic [ref=f3e44]:
+                - paragraph [ref=f3e45]: Auth service elevated error rate
+                - paragraph [ref=f3e46]: JWT validation failures spiking. Mitigated by rolling back bad config.
+                - paragraph [ref=f3e47]: 25/07/2026, 05:32:59
+              - generic [ref=f3e48]:
+                - generic [ref=f3e49]: SEV3
+                - generic [ref=f3e50]: resolved
+          - generic [ref=f3e51]:
+            - generic [ref=f3e52]:
+              - heading "Payment service cascade failure" [level=3] [ref=f3e66]
+              - generic [ref=f3e67]:
+                - generic [ref=f3e68]:
+                  - generic [ref=f3e69]: SEV1
+                  - generic [ref=f3e70]: investigating
+                - generic [ref=f3e71]:
+                  - paragraph [ref=f3e72]: AI Summary
+                  - paragraph [ref=f3e73]: Generating summary…
+                - generic [ref=f3e74]:
+                  - button "Refresh Summary" [ref=f3e75]
+                  - button "Root Cause Analysis" [ref=f3e76]
+                  - button "Generate Postmortem" [ref=f3e77]
+            - generic [ref=f3e55]:
+              - heading "AI Assistant RAG" [level=3] [ref=f3e57]:
+                - text: AI Assistant
+                - generic [ref=f3e58]: RAG
+              - paragraph [ref=f3e62]: Hi! I'm SENTINEL AI. Ask me anything about your incidents, logs, or system health.
+              - generic [ref=f3e63]:
+                - textbox "Ask about incidents, logs, anomalies…" [ref=f3e64]
+                - button "Send" [disabled]
