@@ -69,6 +69,33 @@ const initialState: AuthState = {
   isAuthenticated: false,
 };
 
+// Tokens live in localStorage (read by client fetches via Authorization header)
+// AND in a client-readable cookie. The cookie is what the Next.js edge
+// middleware reads to gate protected routes — without it, middleware never sees
+// the session and bounces every protected page back to /login. This cookie is
+// NOT the security boundary: the API validates the Bearer JWT on every request;
+// the cookie is only a client-side route-guard hint.
+const COOKIE_MAX_AGE = 60 * 60 * 24 * 7; // 7 days (refresh token lifetime bound)
+
+function tokenCookieAttrs(): string {
+  const secure = typeof window !== "undefined" && window.location.protocol === "https:";
+  return `path=/; max-age=${COOKIE_MAX_AGE}; SameSite=Lax${secure ? "; Secure" : ""}`;
+}
+
+function persistTokens(accessToken: string, refreshToken: string) {
+  localStorage.setItem("access_token", accessToken);
+  localStorage.setItem("refresh_token", refreshToken);
+  document.cookie = `access_token=${accessToken}; ${tokenCookieAttrs()}`;
+  document.cookie = `refresh_token=${refreshToken}; ${tokenCookieAttrs()}`;
+}
+
+function clearTokens() {
+  localStorage.removeItem("access_token");
+  localStorage.removeItem("refresh_token");
+  document.cookie = "access_token=; path=/; max-age=0; SameSite=Lax";
+  document.cookie = "refresh_token=; path=/; max-age=0; SameSite=Lax";
+}
+
 const AuthContext = createContext<{
   state: AuthState;
   login: (credentials: LoginRequest) => Promise<void>;
@@ -131,8 +158,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }
 
     const data: LoginResponse = await response.json();
-    localStorage.setItem("access_token", data.access_token);
-    localStorage.setItem("refresh_token", data.refresh_token);
+    persistTokens(data.access_token, data.refresh_token);
 
     setState({
       user: data.user,
@@ -156,8 +182,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }
 
     const result: LoginResponse = await response.json();
-    localStorage.setItem("access_token", result.access_token);
-    localStorage.setItem("refresh_token", result.refresh_token);
+    persistTokens(result.access_token, result.refresh_token);
 
     setState({
       user: result.user,
@@ -182,15 +207,13 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     });
 
     if (!response.ok) {
-      localStorage.removeItem("access_token");
-      localStorage.removeItem("refresh_token");
+      clearTokens();
       setState(initialState);
       return;
     }
 
     const data: LoginResponse = await response.json();
-    localStorage.setItem("access_token", data.access_token);
-    localStorage.setItem("refresh_token", data.refresh_token);
+    persistTokens(data.access_token, data.refresh_token);
 
     setState({
       user: data.user,
@@ -202,8 +225,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   };
 
   const logout = async () => {
-    localStorage.removeItem("access_token");
-    localStorage.removeItem("refresh_token");
+    clearTokens();
     setState(initialState);
   };
 
@@ -268,6 +290,8 @@ export async function authenticatedFetch(
       if (refreshed.ok) {
         const data = await refreshed.json();
         localStorage.setItem("access_token", data.access_token);
+        const secure = window.location.protocol === "https:";
+        document.cookie = `access_token=${data.access_token}; path=/; max-age=${60 * 60 * 24 * 7}; SameSite=Lax${secure ? "; Secure" : ""}`;
         headers.set("Authorization", `Bearer ${data.access_token}`);
         response = await fetch(url, { ...options, headers });
       }
