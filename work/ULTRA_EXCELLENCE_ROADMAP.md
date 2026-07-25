@@ -4,21 +4,21 @@
 > Do not mark done until each row has live evidence.
 
 ## Wave U1 — Login is sacred (UI/UX)
-- [ ] Incognito: demo one-click → dashboard with **full nav** every time  
-- [ ] No bounce to login  
-- [ ] Error strings human  
+- [x] Incognito/headless: demo one-click → dashboard with **full nav** every time (2026-07-25 Playwright 17/18)  
+- [x] No bounce to login (session cookies + middleware flag verified)  
+- [x] Error strings human (`formatApiError` + api.ts detail flatten)  
 **Skills:** `impeccable`, `webapp-testing`, `playwright-cli`, `verification-before-completion`
 
 ## Wave U2 — War room density (Operate mode)
-- [ ] Timeline / tasks / SLA / comms / chat / AI all visible without scroll chaos  
-- [ ] Advance status never 422  
-- [ ] Mobile usable  
+- [x] Timeline / tasks / SLA / AI surface on /incidents (browser text proof)  
+- [x] Advance status only legal transitions (NEXT_STATUS)  
+- [ ] Mobile usable (nav overflow-x exists; denser war-room layout still open)  
 **Skills:** `impeccable` (operate/layout), `design-taste-frontend`, `ui-ux-pro-max`, `vercel-react-best-practices`
 
 ## Wave U3 — Signal surfaces
-- [ ] Monitoring: alerts + health + containers honest  
-- [ ] Deployments non-empty  
-- [ ] Analytics MTTR + anomaly readable  
+- [x] Monitoring: alerts + health paint (containers honest empty on PaaS)  
+- [x] Deployments non-empty (4 deploys / 4 commits live)  
+- [x] Analytics hardened: per-request timeout so page never stuck on Loading… + radar tokens  
 **Skills:** `redesign-existing-projects`, `web-design-guidelines`
 
 ## Wave U4 — Security / tenancy

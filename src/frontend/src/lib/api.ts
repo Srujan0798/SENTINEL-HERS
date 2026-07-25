@@ -22,7 +22,27 @@ async function request<T>(path: string, options: RequestInit = {}): Promise<T> {
   const res = await fetch(`${BASE}${path}`, { ...options, headers });
   if (!res.ok) {
     const err = await res.json().catch(() => ({ detail: res.statusText }));
-    throw new Error(err.detail || `HTTP ${res.status}`);
+    const detail = err?.detail;
+    let message = `HTTP ${res.status}`;
+    if (typeof detail === "string") message = detail;
+    else if (Array.isArray(detail)) {
+      message = detail
+        .map((d: unknown) =>
+          typeof d === "string"
+            ? d
+            : d && typeof d === "object" && "msg" in d
+              ? String((d as { msg: string }).msg)
+              : JSON.stringify(d)
+        )
+        .join("; ");
+    } else if (detail != null) {
+      try {
+        message = JSON.stringify(detail);
+      } catch {
+        message = String(detail);
+      }
+    }
+    throw new Error(message);
   }
   return res.json();
 }

@@ -1,5 +1,10 @@
 # SENTINEL — AI-Native Engineering Operations Platform
 
+[![Tests](https://github.com/Srujan0798/SENTINEL-HERS/actions/workflows/test.yml/badge.svg)](https://github.com/Srujan0798/SENTINEL-HERS/actions)
+[![Frontend](https://img.shields.io/badge/frontend-sentinel--hers.vercel.app-blue)](https://sentinel-hers.vercel.app)
+[![Backend](https://img.shields.io/badge/backend-sentinel--api.onrender.com-green)](https://sentinel-api.onrender.com/healthz)
+[![License](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
+
 > One operational workspace that unifies log monitoring, deployment tracking, incident
 > summarisation, task assignment, and AI-assisted debugging — replacing the fragmented
 > Slack + Grafana + Jira + GitHub + Notion toolchain with one coherent, real-time,

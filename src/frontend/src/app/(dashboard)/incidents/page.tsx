@@ -452,57 +452,58 @@ export default function IncidentsPage() {
                   </Dialog>
                 </div>
 
-                {/* Timeline provenance */}
-                <div>
-                  <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-2">
-                    Timeline
-                  </p>
-                  {warLoading ? (
-                    <p className="text-xs text-muted-foreground animate-pulse">Loading war room…</p>
-                  ) : timeline.length === 0 ? (
-                    <p className="text-xs text-muted-foreground">No timeline events yet.</p>
-                  ) : (
-                    <ol className="space-y-2 border-l-2 border-muted pl-3">
-                      {timeline.map((ev) => (
-                        <li key={ev.id} className="text-xs">
-                          <div className="font-medium">{ev.event_type}</div>
-                          <div className="text-muted-foreground">{ev.description}</div>
-                          <div className="text-[10px] text-muted-foreground mt-0.5">
-                            {ev.source} · {ev.actor} · {new Date(ev.ts).toLocaleString()}
-                          </div>
-                        </li>
-                      ))}
-                    </ol>
-                  )}
-                </div>
+                {/* Timeline + tasks denser side-by-side on wider detail column */}
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                  <div className="min-w-0">
+                    <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-2">
+                      Timeline
+                    </p>
+                    {warLoading ? (
+                      <p className="text-xs text-muted-foreground animate-pulse">Loading war room…</p>
+                    ) : timeline.length === 0 ? (
+                      <p className="text-xs text-muted-foreground">No timeline events yet.</p>
+                    ) : (
+                      <ol className="space-y-2 border-l-2 border-[color:var(--line)] pl-3 max-h-48 overflow-y-auto">
+                        {timeline.map((ev) => (
+                          <li key={ev.id} className="text-xs">
+                            <div className="font-medium font-data">{ev.event_type}</div>
+                            <div className="text-muted-foreground">{ev.description}</div>
+                            <div className="text-[10px] text-muted-foreground mt-0.5 font-data">
+                              {ev.source} · {ev.actor} · {new Date(ev.ts).toLocaleString()}
+                            </div>
+                          </li>
+                        ))}
+                      </ol>
+                    )}
+                  </div>
 
-                {/* Tasks */}
-                <div>
-                  <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-2">
-                    Tasks
-                  </p>
-                  {tasks.length === 0 ? (
-                    <p className="text-xs text-muted-foreground">No tasks for this incident.</p>
-                  ) : (
-                    <ul className="space-y-1.5">
-                      {tasks.map((t) => (
-                        <li key={t.id} className="flex items-start gap-2 text-sm">
-                          <input
-                            type="checkbox"
-                            className="mt-1"
-                            checked={t.status === "completed"}
-                            onChange={() => toggleTask(t)}
-                          />
-                          <div className="min-w-0">
-                            <p className={t.status === "completed" ? "line-through text-muted-foreground" : ""}>
-                              {t.title}
-                            </p>
-                            <p className="text-[10px] text-muted-foreground uppercase">{t.priority}</p>
-                          </div>
-                        </li>
-                      ))}
-                    </ul>
-                  )}
+                  <div className="min-w-0">
+                    <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-2">
+                      Tasks
+                    </p>
+                    {tasks.length === 0 ? (
+                      <p className="text-xs text-muted-foreground">No tasks for this incident.</p>
+                    ) : (
+                      <ul className="space-y-1.5 max-h-48 overflow-y-auto">
+                        {tasks.map((t) => (
+                          <li key={t.id} className="flex items-start gap-2 text-sm">
+                            <input
+                              type="checkbox"
+                              className="mt-1"
+                              checked={t.status === "completed"}
+                              onChange={() => toggleTask(t)}
+                            />
+                            <div className="min-w-0">
+                              <p className={t.status === "completed" ? "line-through text-muted-foreground" : ""}>
+                                {t.title}
+                              </p>
+                              <p className="text-[10px] text-muted-foreground uppercase font-data">{t.priority}</p>
+                            </div>
+                          </li>
+                        ))}
+                      </ul>
+                    )}
+                  </div>
                 </div>
               </CardContent>
             </Card>

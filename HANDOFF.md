@@ -1,28 +1,46 @@
-# HANDOFF — SENTINEL (FINAL)
+# HANDOFF — SENTINEL (merged sessions · 2026-07-25)
 
-> Replace, never append. Loop cancelled. Project submission-ready (verified).
+> Replace, never append. Orchestrator: Grok merged Claude + Grok excellence history.
 
 ## Loop
-- **Stopped:** scheduled excellence loop `019f97d6329f` cancelled.
+- Excellence loop cancelled earlier; **U1–U3 craft still active** after session merge.
+- Claude session `6676d450…` hit rate-limit mid “complete 100%”; work continues here.
 
-## Live (final check)
+## Live (verified this session)
 | Item | Value |
 |------|--------|
 | Frontend | https://sentinel-hers.vercel.app |
 | Backend | https://sentinel-api-clu9.onrender.com |
-| Health | `/healthz` → ok |
-| Demo status | `/api/demo-status` → **ready**, open_sev1_count: 1 |
+| Health | `/healthz` → ok (cold start may take ~20s) |
+| Demo status | `ready`, open_sev1_count: 1 |
 | Demo login | `demo@sentinel.io` / `Sentinel2026!` |
-| Tests | **185 passed** |
-| WRITEUP | present (~1149 words) |
-| GitHub | https://github.com/Srujan0798/SENTINEL-HERS public |
+| GitHub | https://github.com/Srujan0798/SENTINEL-HERS |
+
+## Browser proof (Playwright headless, this session)
+**17/18 pass** on production:
+- Login demo one-click → `/dashboard`
+- Session cookies: `sentinel_session`, `access_token`, `refresh_token`
+- Full nav: Dashboard · Incidents · Monitoring · Deployments · Analytics · Settings
+- SEV1 CTA, war room content, monitoring alerts, deployments non-empty
+- **FAIL was Analytics stuck on “Loading…”** → fixed locally (timeouts + partial data)
+
+## Shipped earlier (session merge)
+Cookie auth, nested role/nav, sticky chat overlap, status transitions, SLA countdown,
+monitoring paths, RCA shape, containers timeout, design tokens (PRODUCT/DESIGN), skills pack.
+
+## Open (do next)
+1. **Push FE fix** for analytics hang + radar polish on deployments/analytics
+2. U2 mobile war-room density polish
+3. U4 security-review triage
+4. U6 commit Playwright smoke into CI
+5. Optional Loom demo video
 
 ## Judge path
-1. Open FE → **Fill demo** credentials  
-2. Dashboard → **Open SEV1 war room** (or Incidents auto-opens SEV1)  
-3. AI summary · RCA · timeline · tasks · SLA countdown · comms · chat · postmortem  
+1. Open FE → **Enter live SEV1 demo**  
+2. Dashboard → **Open SEV1 war room**  
+3. AI summary · RCA · timeline · tasks · SLA · comms · chat · postmortem  
 4. Monitoring · Deployments · Analytics  
 
 ## Status
-**COMPLETE for METIS Hard submission** against `ps.md` mandatory bar + all 10 FRs + brownie surfaces in product.
-Optional only: Loom demo video.
+**Submission bar met** (live URLs + public repo + WRITEUP + suite).  
+**Ultra excellence not finished** — craft/proof still open per `work/ULTRA_EXCELLENCE_ROADMAP.md`.

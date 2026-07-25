@@ -27,15 +27,15 @@ interface Commit {
 }
 
 const STATUS_COLORS: Record<string, string> = {
-  success: "bg-green-100 text-green-700",
-  pending: "bg-yellow-100 text-yellow-700",
-  failed: "bg-red-100 text-red-700",
-  running: "bg-blue-100 text-blue-700",
+  success: "bg-[color:var(--ok)]/15 text-[color:var(--ok)]",
+  pending: "bg-[color:var(--warn)]/15 text-[color:var(--warn)]",
+  failed: "bg-[color:var(--sev1)]/15 text-[color:var(--sev1)]",
+  running: "bg-[color:var(--ice)]/15 text-[color:var(--ice)]",
 };
 
 const SOURCE_COLORS: Record<string, string> = {
-  github: "bg-gray-900 text-white",
-  gitlab: "bg-orange-500 text-white",
+  github: "bg-[color:var(--panel-elevated)] text-[color:var(--ink)] border border-[color:var(--line)]",
+  gitlab: "bg-[color:var(--phosphor)]/20 text-[color:var(--phosphor)]",
 };
 
 export default function DeploymentsPage() {
@@ -97,7 +97,7 @@ export default function DeploymentsPage() {
             <CardTitle className="text-sm font-medium text-muted-foreground">Success Rate</CardTitle>
           </CardHeader>
           <CardContent>
-            <div className="text-3xl font-bold text-green-600">{successRate}%</div>
+            <div className="text-3xl font-bold font-data text-[color:var(--ok)]">{successRate}%</div>
           </CardContent>
         </Card>
         <Card>
