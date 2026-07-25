@@ -21,20 +21,18 @@
 
 ## What is the progress till now? *
 
-**HONEST ASSESSMENT:** SENTINEL has a scaffold with modules and ~183 passing tests, but is NOT yet a winning Hard-track product. Current win-score: ~15-20%.
+**HONEST ASSESSMENT (ETERNITY dogfood, 2026-07-25):** Live demo path works; suite ~196 tests. **Not freeze-100%.** Honest score ~50% band and climbing.
 
-**What works (live):** /healthz, /auth/login, /api/demo-status, frontend renders login page.
+**What works (live):** healthz, demo login, open SEV1, incidents/alerts/deployments/SLA/analytics, AI summary (non-mock), unauth voice/health → 401, FE login + war room path.
 
-**Critical gaps (must fix before judges see it):**
-- Voice endpoint accepts unauth input (client-supplied team_id, no 401)
-- Health services return data without authentication (cross-tenant leak)
-- RBAC policy exists but NOT wired on any route
-- AI summary endpoint 404 (mock provider, not live)
-- SSE endpoint 404 (no realtime events)
-- Tasks, Deployments, Timeline, Analytics all 404
-- Most data endpoints not returning live data
+**Still open (not greenwash):**
+- Deploy latest main so demo-status stops any residual password field
+- Full hostile TOP-10 security evidence pack
+- Realtime multi-tab proof in browser
+- UI craft / COMPLETE-language purge in old reports
+- CI + verify_live both green on every push
 
-**Status: ~40 endpoints exist in code, security holes being patched, live AI + realtime being activated.**
+**Status: production-leaning MVP under active ETERNITY close — do not claim submission-perfect yet.**
 
 ---
 
