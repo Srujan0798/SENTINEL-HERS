@@ -1,6 +1,6 @@
 import uuid
 from datetime import datetime
-from sqlalchemy import Column, String, DateTime, Text, Boolean
+from sqlalchemy import Column, String, DateTime, Text, ForeignKey
 from src.backend.db import Base
 
 
@@ -8,8 +8,8 @@ class Task(Base):
     __tablename__ = "tasks"
 
     id = Column(String(36), primary_key=True, default=lambda: str(uuid.uuid4()))
-    team_id = Column(String(36), nullable=False, index=True)
-    incident_id = Column(String(36), nullable=False, index=True)
+    team_id = Column(String(36), ForeignKey("teams.id"), nullable=False, index=True)
+    incident_id = Column(String(36), ForeignKey("incidents.id", ondelete="CASCADE"), nullable=False, index=True)
     title = Column(String(500), nullable=False)
     description = Column(Text, nullable=True)
     status = Column(String(50), nullable=False, default="open")

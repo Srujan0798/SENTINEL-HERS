@@ -13,7 +13,7 @@ class Incident(Base):
     __tablename__ = "incidents"
 
     id = Column(String(36), primary_key=True, default=lambda: str(uuid.uuid4()))
-    team_id = Column(String(36), nullable=False, index=True)
+    team_id = Column(String(36), ForeignKey("teams.id"), nullable=False, index=True)
     title = Column(String(500), nullable=False)
     description = Column(Text, nullable=True)
     severity = Column(String(10), nullable=False, default=SeverityLevel.SEV3.value)

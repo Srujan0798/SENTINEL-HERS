@@ -36,6 +36,24 @@ anomaly_scores = Histogram(
     buckets=[0.0, 0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9, 1.0],
 )
 
+ai_request_duration_seconds = Histogram(
+    "sentinel_ai_request_duration_seconds",
+    "AI provider request latency",
+    ["feature"],
+    buckets=[0.5, 1.0, 2.0, 5.0, 10.0, 30.0, 60.0],
+)
+
+ai_requests_total = Counter(
+    "sentinel_ai_requests_total",
+    "Total AI requests by feature and provider",
+    ["feature", "provider"],
+)
+
+sse_connections = Gauge(
+    "sentinel_sse_active_connections",
+    "Active SSE connections",
+)
+
 
 async def metrics_middleware(request: Request, call_next):
     start = time.perf_counter()
