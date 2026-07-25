@@ -51,6 +51,8 @@ def _github_sig(body: bytes) -> str:
 
 @pytest.fixture(autouse=True, scope="module")
 def setup_db():
+    # Drop auth overrides left by other modules (shared app object).
+    app.dependency_overrides.clear()
     app.dependency_overrides[get_db] = override_db
     Base.metadata.create_all(bind=engine)
     yield
@@ -203,5 +205,11 @@ class TestDeploymentListing:
         assert isinstance(resp.json(), list)
 
     def test_deployments_unauthorized(self):
+        # Ensure no leftover fake auth from other test modules.
+        app.dependency_overrides.pop(
+            __import__("src.backend.auth.dependencies", fromlist=["get_current_user_dependency"]).get_current_user_dependency,
+            None,
+        )
+        app.dependency_overrides[get_db] = override_db
         resp = client.get("/api/integrations/deployments")
-        assert resp.status_code in (401, 403)
+        assert resp.status_code in (401, 403), resp.text
