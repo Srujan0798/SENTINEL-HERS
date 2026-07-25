@@ -1,12 +1,13 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import Link from "next/link";
 import { useUser, useRole } from "@/lib/auth";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { api, AnalyticsSummary, Incident, type SlaStatus } from "@/lib/api";
+import { useRealtimeEvents } from "@/lib/realtime";
 
 function timeAgo(dateStr: string): string {
   const diff = Date.now() - new Date(dateStr).getTime();
@@ -41,12 +42,53 @@ export default function DashboardPage() {
   const [summary, setSummary] = useState<AnalyticsSummary | null>(null);
   const [incidents, setIncidents] = useState<Incident[]>([]);
   const [slaRows, setSlaRows] = useState<SlaStatus[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState<string | null>(null);
+
+  const loadDashboard = useCallback(() => {
+    setLoadError(null);
+    setLoading(true);
+    Promise.allSettled([
+      api.get<AnalyticsSummary>("/api/analytics/incidents/summary"),
+      api.get<{ data: Incident[] }>("/api/incidents"),
+      api.get<SlaStatus[]>("/api/sla"),
+    ]).then(([s, i, sla]) => {
+      let fails = 0;
+      if (s.status === "fulfilled") setSummary(s.value);
+      else {
+        setSummary(null);
+        fails += 1;
+      }
+      if (i.status === "fulfilled") setIncidents(i.value?.data || []);
+      else {
+        setIncidents([]);
+        fails += 1;
+      }
+      if (sla.status === "fulfilled") setSlaRows(Array.isArray(sla.value) ? sla.value : []);
+      else {
+        setSlaRows([]);
+        fails += 1;
+      }
+      if (fails === 3) {
+        setLoadError("Dashboard APIs unreachable. Check network, login, or API URL — not an empty healthy system.");
+      } else if (fails > 0) {
+        setLoadError(`${fails} of 3 dashboard panels failed — partial data shown.`);
+      }
+      setLoading(false);
+    });
+  }, []);
 
   useEffect(() => {
-    api.get<AnalyticsSummary>("/api/analytics/incidents/summary").then(setSummary);
-    api.get<{ data: Incident[] }>("/api/incidents").then((res) => setIncidents(res.data));
-    api.get<SlaStatus[]>("/api/sla").then((rows) => setSlaRows(Array.isArray(rows) ? rows : [])).catch(() => setSlaRows([]));
-  }, []);
+    loadDashboard();
+  }, [loadDashboard]);
+
+  // Live refresh when incidents/tasks change (named SSE — second-tab proof path)
+  useRealtimeEvents(
+    ["incident.create", "incident.update", "incident.assign", "incident.escalate", "task.create", "task.update"],
+    () => {
+      loadDashboard();
+    }
+  );
 
   const totalIncidents = summary?.total_incidents ?? 0;
   const sev1Active =
@@ -66,6 +108,14 @@ export default function DashboardPage() {
     (i) => i.severity === "SEV1" && i.status !== "resolved" && i.status !== "closed"
   );
 
+  if (loading) {
+    return (
+      <div className="flex h-64 items-center justify-center text-sm text-muted-foreground font-data">
+        Loading dashboard…
+      </div>
+    );
+  }
+
   return (
     <div className="space-y-6">
       <div className="flex flex-col sm:flex-row sm:items-end sm:justify-between gap-3">
@@ -74,6 +124,14 @@ export default function DashboardPage() {
           <p className="text-muted-foreground mt-1">
             Welcome back, {user?.name}. You are signed in as <strong>{role}</strong>.
           </p>
+          {loadError && (
+            <p className="mt-2 text-xs font-data text-[color:var(--warn)]" role="alert">
+              {loadError}{" "}
+              <button type="button" className="underline text-[color:var(--ice)]" onClick={() => loadDashboard()}>
+                Retry
+              </button>
+            </p>
+          )}
         </div>
         {openSev1 && (
           <Button asChild variant="destructive" size="sm">

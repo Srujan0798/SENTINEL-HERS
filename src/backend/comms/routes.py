@@ -7,6 +7,7 @@ from sqlalchemy.orm import Session
 
 from src.backend.auth.dependencies import get_current_user_dependency
 from src.backend.db import get_db
+from src.backend.rbac.dependencies import require_permission
 
 from .schemas import (
     ChannelResponse,
@@ -64,6 +65,7 @@ async def post_message(
     body: MessageCreate,
     db: Session = Depends(get_db),
     current_user: dict = Depends(get_current_user_dependency),
+    _rbac=Depends(require_permission("channels:write")),
 ):
     """Post a message to the incident's channel. Fans out via realtime hub."""
     team_id = current_user["team_id"]

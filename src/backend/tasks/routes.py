@@ -11,6 +11,7 @@ from sqlalchemy.orm import Session
 from src.backend.auth.dependencies import get_current_user_dependency
 from src.backend.db import get_db
 from src.backend.incidents.models import Incident
+from src.backend.rbac.dependencies import require_permission
 from src.backend.tasks.models import Task
 
 router = APIRouter(tags=["tasks", "sla"])
@@ -49,6 +50,7 @@ async def create_task(
     body: TaskCreate,
     db: Session = Depends(get_db),
     current_user: dict = Depends(get_current_user_dependency),
+    _rbac=Depends(require_permission("tasks:create")),
 ):
     team_id = current_user["team_id"]
     incident = db.query(Incident).filter(
@@ -95,6 +97,7 @@ async def update_task(
     body: TaskUpdate,
     db: Session = Depends(get_db),
     current_user: dict = Depends(get_current_user_dependency),
+    _rbac=Depends(require_permission("tasks:update")),
 ):
     team_id = current_user["team_id"]
     task = db.query(Task).filter(Task.id == str(task_id), Task.team_id == team_id).first()

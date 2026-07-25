@@ -46,7 +46,13 @@ export function useRealtimeStream(
       reconnectTimeoutRef.current = null;
     }
     if (eventSourceRef.current) {
-      eventSourceRef.current.close();
+      const es = eventSourceRef.current;
+      const named = (es as unknown as { __namedListeners?: Array<[string, (e: MessageEvent) => void]> })
+        .__namedListeners;
+      if (named) {
+        for (const [t, fn] of named) es.removeEventListener(t, fn as EventListener);
+      }
+      es.close();
       eventSourceRef.current = null;
     }
   }, []);
@@ -85,15 +91,41 @@ export function useRealtimeStream(
       }
     };
 
-    // Listen for all event types via the generic 'message' handler
-    es.onmessage = (event) => {
+    // Backend uses named SSE events (`event: incident.create`). Named events do
+    // NOT fire `onmessage` — only default (unnamed) events do. Register known types.
+    const dispatch = (raw: MessageEvent, fallbackType?: string) => {
       try {
-        const data = JSON.parse(event.data);
+        const data = JSON.parse(raw.data) as RealtimeEvent;
+        if (!data.event_type && fallbackType) data.event_type = fallbackType;
         handlerRef.current(data);
       } catch {
-        // Ignore malformed messages
+        /* ignore malformed */
       }
     };
+
+    const namedTypes = [
+      "connected",
+      "incident.create",
+      "incident.update",
+      "incident.assign",
+      "incident.escalate",
+      "task.create",
+      "task.update",
+      "channel.message",
+      "mention.created",
+      "alert.created",
+      "deployment.created",
+      "ping",
+    ];
+    const listeners: Array<[string, (e: MessageEvent) => void]> = namedTypes.map((t) => {
+      const fn = (e: MessageEvent) => dispatch(e, t);
+      es.addEventListener(t, fn as EventListener);
+      return [t, fn];
+    });
+    es.onmessage = (event) => dispatch(event);
+
+    // stash for cleanup
+    (es as unknown as { __namedListeners?: typeof listeners }).__namedListeners = listeners;
   }, [enabled, cleanup, onOpen, onError, onDisconnect]);
 
   useEffect(() => {

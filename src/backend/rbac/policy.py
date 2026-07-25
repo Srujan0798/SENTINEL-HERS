@@ -25,6 +25,7 @@ POLICY: dict[str, set[Role]] = {
     "logs:read": {Role.OWNER, Role.ADMIN, Role.RESPONDER, Role.VIEWER},
     "logs:write": {Role.OWNER, Role.ADMIN, Role.RESPONDER},
     "health:read": {Role.OWNER, Role.ADMIN, Role.RESPONDER, Role.VIEWER},
+    "health:write": {Role.OWNER, Role.ADMIN, Role.RESPONDER},
     "deployments:read": {Role.OWNER, Role.ADMIN, Role.RESPONDER, Role.VIEWER},
     "deployments:create": {Role.OWNER, Role.ADMIN},
     "commits:read": {Role.OWNER, Role.ADMIN, Role.RESPONDER, Role.VIEWER},

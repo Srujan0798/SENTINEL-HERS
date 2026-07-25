@@ -47,14 +47,24 @@ export function StatusBar({ teamId }: StatusBarProps) {
         setLastEvent(e.type || "event");
       }
     };
-    es.addEventListener("connected", onNamed as EventListener);
-    es.addEventListener("channel.message", onNamed as EventListener);
-    es.addEventListener("ping", () => setState("connected"));
+    const types = [
+      "connected",
+      "channel.message",
+      "incident.create",
+      "incident.update",
+      "incident.assign",
+      "incident.escalate",
+      "task.create",
+      "task.update",
+      "alert.created",
+      "deployment.created",
+      "ping",
+    ];
+    for (const t of types) es.addEventListener(t, onNamed as EventListener);
     es.onmessage = onNamed;
 
     return () => {
-      es.removeEventListener("connected", onNamed as EventListener);
-      es.removeEventListener("channel.message", onNamed as EventListener);
+      for (const t of types) es.removeEventListener(t, onNamed as EventListener);
       es.close();
       setState("disconnected");
     };

@@ -12,6 +12,7 @@ from sqlalchemy.orm import Session
 
 from src.backend.auth.dependencies import get_current_user_dependency
 from src.backend.db import get_db
+from src.backend.rbac.dependencies import require_permission
 from .models import HealthStatus, ServiceHealthCreate, ServiceHealthResponse
 
 logger = logging.getLogger(__name__)
@@ -111,6 +112,7 @@ async def register_service(
     service: ServiceHealthCreate,
     db: Session = Depends(get_db),
     current_user: dict = Depends(get_current_user_dependency),
+    _rbac=Depends(require_permission("health:write")),
 ):
     """Register a service for monitoring."""
     try:

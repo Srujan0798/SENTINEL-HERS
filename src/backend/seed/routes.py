@@ -54,8 +54,13 @@ async def demo_status(db: Session = Depends(get_db)):
     )
     # Ready only when an *open* SEV1 exists for the sacred war-room demo path.
     ready = bool(user and incidents >= 1 and open_sev1 >= 1)
-    is_prod = os.getenv("ENV", "development").lower() in ("production", "prod")
-    return {
+    # Never put the demo password in a public API body (judges use README / login UI).
+    # ENV=production|prod OR common PaaS markers ⇒ treat as prod for any residual hints.
+    env = os.getenv("ENV", "development").lower()
+    is_prod = env in ("production", "prod") or bool(
+        os.getenv("RENDER") or os.getenv("RENDER_SERVICE_ID") or os.getenv("RAILWAY_ENVIRONMENT")
+    )
+    body: dict = {
         "ready": ready,
         "demo_email": DEMO_EMAIL,
         "incident_count": incidents,
@@ -63,13 +68,14 @@ async def demo_status(db: Session = Depends(get_db)):
         "open_sev1_count": open_sev1,
         "resolved_count": resolved,
         "frontend": "https://sentinel-hers.vercel.app",
-        **({"login_hint": "demo@sentinel.io / Sentinel2026!"} if not is_prod else {} ),
-        **(
-            {}
-            if ready
-            else {"reason": "no open SEV1 — run AUTO_SEED_DEMO repair or POST /api/seed"}
-        ),
+        # Email only — password never returned (security + ETERNITY S7).
+        "demo_login_path": "/login",
     }
+    if not ready:
+        body["reason"] = "no open SEV1 — run AUTO_SEED_DEMO repair or POST /api/seed"
+    if not is_prod:
+        body["hint"] = "Use README demo credentials on the login page (password not exposed via API)."
+    return body
 
 
 def _seed_secret() -> str | None:
