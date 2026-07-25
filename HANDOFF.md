@@ -1,6 +1,6 @@
 # HANDOFF — SENTINEL-HERS
 **schema_version:** 2.2 · **Updated:** 2026-07-25  
-**Score:** ~48% · **Caps (sticky):** honesty residual (no COMPLETE claim)  
+**Score:** ~55% · **Caps (sticky):** honesty residual (no COMPLETE claim)  
 **Phase:** E4 W1–W4 in progress · **Archetype:** hackathon+saas · **Stage:** mid-close  
 
 **Narrative:** Session resumed project work. Live demo path works; unauth 401s on voice/health. demo-status password stripped in code (deploy pending). Tasks RBAC + production-route viewer 403 tests added. FE SSE now listens to named incident events; dashboard reloads on incident.* SSE.
