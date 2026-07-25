@@ -59,9 +59,27 @@ export default function MonitoringPage() {
   const [resolving, setResolving] = useState<string | null>(null);
 
   async function load() {
+    // Containers can hang when Docker socket is missing — race with a short timeout
+    // so alerts/service health still paint for judges.
+    const containersPromise = Promise.race([
+      api.get<ContainersResponse>("/api/integrations/containers"),
+      new Promise<ContainersResponse>((resolve) =>
+        setTimeout(
+          () =>
+            resolve({
+              docker: { available: false, reason: "Timed out probing Docker", containers: [] },
+              kubernetes: { available: false, reason: "Timed out probing Kubernetes", pods: [] },
+              total: 0,
+              unhealthy: [],
+            }),
+          4000
+        )
+      ),
+    ]);
+
     const [a, c, h, logs] = await Promise.allSettled([
       api.get<Alert[]>("/api/alerts"),
-      api.get<ContainersResponse>("/api/integrations/containers"),
+      containersPromise,
       api.get<ServiceHealth[]>("/api/health/services/"),
       api.get<{ data: Array<Record<string, unknown>> }>("/api/logs/search?per_page=8"),
     ]);

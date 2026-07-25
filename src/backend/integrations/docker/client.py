@@ -26,7 +26,9 @@ def list_containers() -> dict[str, Any]:
             "containers": [],
         }
     try:
-        client = _docker.from_env()
+        # Short timeouts so PaaS hosts without a docker.sock never hang the
+        # Monitoring page (Render/Vercel judges path).
+        client = _docker.from_env(timeout=3)
         containers = client.containers.list()
         result = []
         for c in containers:

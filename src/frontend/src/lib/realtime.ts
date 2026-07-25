@@ -60,9 +60,10 @@ export function useRealtimeStream(
     cleanup();
 
     const wsBase = process.env.NEXT_PUBLIC_WS_URL;
+    // Mounted at /api/realtime/events (not /api/v1/…)
     const url = wsBase
-      ? `${wsBase.replace(/\/$/, "")}/api/v1/realtime/events?token=${encodeURIComponent(token)}`
-      : `${API_ORIGIN}/api/v1/realtime/events?token=${encodeURIComponent(token)}`;
+      ? `${wsBase.replace(/\/$/, "")}/api/realtime/events?token=${encodeURIComponent(token)}`
+      : `${API_ORIGIN}/api/realtime/events?token=${encodeURIComponent(token)}`;
     const es = new EventSource(url);
     eventSourceRef.current = es;
 

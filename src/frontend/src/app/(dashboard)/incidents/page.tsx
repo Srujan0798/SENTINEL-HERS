@@ -383,10 +383,26 @@ export default function IncidentsPage() {
                     onClick={async () => {
                       try {
                         const res = await api.post<{
-                          suggestions: Array<{ cause: string; confidence: number }>;
+                          root_causes?: Array<{
+                            hypothesis?: string;
+                            cause?: string;
+                            confidence: number;
+                            suggested_action?: string;
+                          }>;
+                          suggestions?: Array<{ cause?: string; hypothesis?: string; confidence: number }>;
                         }>(`/api/ai/incidents/${selected.id}/root-causes`, {});
-                        const causes = res.suggestions
-                          .map((s) => `• ${s.cause} (${Math.round(s.confidence * 100)}%)`)
+                        const rows = res.root_causes || res.suggestions || [];
+                        if (!rows.length) {
+                          setAiSummary("No root-cause hypotheses returned.");
+                          return;
+                        }
+                        const causes = rows
+                          .map((s) => {
+                            const label = s.hypothesis || s.cause || "Unknown";
+                            const pct = Math.round((s.confidence ?? 0) * 100);
+                            const action = s.suggested_action ? `\n  → ${s.suggested_action}` : "";
+                            return `• ${label} (${pct}%)${action}`;
+                          })
                           .join("\n");
                         setAiSummary(`Root Causes:\n${causes}`);
                       } catch {
