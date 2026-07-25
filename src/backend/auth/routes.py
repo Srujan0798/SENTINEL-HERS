@@ -1,7 +1,8 @@
-from fastapi import APIRouter, Depends, status
+from fastapi import APIRouter, Depends, Request, status
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 from sqlalchemy.orm import Session
 
+from api.main import limiter
 from src.backend.db import get_db
 from .models import LoginRequest, RefreshRequest, RegisterRequest, TokenResponse, UserResponse
 from .service import (
@@ -24,18 +25,21 @@ async def get_current_user_dependency(
 
 
 @router.post("/register", response_model=TokenResponse, status_code=status.HTTP_201_CREATED)
-async def register_user(request: RegisterRequest, db: Session = Depends(get_db)) -> TokenResponse:
-    return register(request, db)
+@limiter.limit("5/minute")
+async def register_user(request: Request, body: RegisterRequest, db: Session = Depends(get_db)) -> TokenResponse:
+    return register(body, db)
 
 
 @router.post("/login", response_model=TokenResponse)
-async def login_user(request: LoginRequest, db: Session = Depends(get_db)) -> TokenResponse:
-    return login(request, db)
+@limiter.limit("10/minute")
+async def login_user(request: Request, body: LoginRequest, db: Session = Depends(get_db)) -> TokenResponse:
+    return login(body, db)
 
 
 @router.post("/refresh", response_model=TokenResponse)
-async def refresh_access_token(request: RefreshRequest, db: Session = Depends(get_db)) -> TokenResponse:
-    return refresh_token(request, db)
+@limiter.limit("20/minute")
+async def refresh_access_token(request: Request, body: RefreshRequest, db: Session = Depends(get_db)) -> TokenResponse:
+    return refresh_token(body, db)
 
 
 @router.get("/me", response_model=UserResponse)

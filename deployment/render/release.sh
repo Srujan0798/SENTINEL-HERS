@@ -12,6 +12,12 @@ log "starting release: migrations + demo seed"
 log "applying DB migrations"
 python -c "from api.startup import run_migrations; run_migrations()"
 
+# Apply SQL indexes if psql is available
+if command -v psql &>/dev/null && [[ -n "${DATABASE_URL:-}" ]]; then
+  log "applying SQL migration indexes"
+  psql "${DATABASE_URL}" -f deployment/render/migrations.sql 2>/dev/null || log "WARN: SQL migration skipped (non-fatal)"
+fi
+
 SEED_PORT="${SEED_PORT:-8099}"
 log "booting local API on 127.0.0.1:${SEED_PORT} for seeding"
 uvicorn api.main:app --host 127.0.0.1 --port "${SEED_PORT}" >/tmp/seed-api.log 2>&1 &

@@ -44,3 +44,4 @@ requests>=2.31.0
 # Test
 pytest>=8
 pytest-asyncio
+slowapi
