@@ -442,7 +442,7 @@ export function CommsPanel({
                 key={m.id}
                 className={`text-sm rounded-md px-2 py-1.5 ${
                   isAi
-                    ? "bg-blue-50 border border-blue-200"
+                    ? "bg-[color:var(--phosphor)]/10 border border-[color:var(--phosphor)]/30"
                     : isSystem
                     ? "bg-muted text-muted-foreground italic"
                     : isMine

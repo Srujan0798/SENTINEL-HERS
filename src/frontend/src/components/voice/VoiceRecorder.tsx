@@ -335,7 +335,7 @@ function Waveform() {
       {Array.from({ length: 12 }).map((_, i) => (
         <div
           key={i}
-          className="w-1 bg-red-500 rounded-full animate-pulse"
+          className="w-1 bg-[color:var(--sev1)] rounded-full animate-pulse"
           style={{
             height: `${8 + Math.random() * 20}px`,
             animationDelay: `${i * 0.08}s`,

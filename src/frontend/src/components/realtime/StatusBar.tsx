@@ -72,10 +72,10 @@ export function StatusBar({ teamId }: StatusBarProps) {
 
   const dot =
     state === "connected"
-      ? "bg-green-500"
+      ? "bg-[color:var(--ok)]"
       : state === "connecting"
-      ? "bg-yellow-400 animate-pulse"
-      : "bg-red-500";
+      ? "bg-[color:var(--warn)] animate-pulse"
+      : "bg-[color:var(--sev1)]";
 
   return (
     <div className="flex items-center gap-2 text-xs text-muted-foreground">

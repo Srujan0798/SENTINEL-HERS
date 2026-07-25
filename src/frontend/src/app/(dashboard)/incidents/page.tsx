@@ -24,7 +24,7 @@ import { VoiceRecorder } from "@/components/voice/VoiceRecorder";
 
 const SEV_COLORS: Record<string, string> = {
   SEV1: "destructive",
-  SEV2: "destructive",
+  SEV2: "secondary",
   SEV3: "secondary",
   SEV4: "outline",
 } as const;

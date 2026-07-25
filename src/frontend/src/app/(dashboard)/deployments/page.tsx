@@ -186,7 +186,7 @@ export default function DeploymentsPage() {
             <div className="space-y-2">
               {commits.slice(0, 15).map((c) => (
                 <div key={c.id} className="flex items-start gap-3 py-2 border-b last:border-0">
-                  <code className="text-xs bg-gray-100 px-2 py-0.5 rounded font-mono shrink-0">
+                  <code className="text-xs bg-[color:var(--panel-elevated)] px-2 py-0.5 rounded font-mono shrink-0">
                     {c.sha?.slice(0, 7)}
                   </code>
                   <div className="flex-1 min-w-0">
