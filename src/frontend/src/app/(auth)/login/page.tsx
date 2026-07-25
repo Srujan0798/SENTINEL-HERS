@@ -89,6 +89,27 @@ function LoginForm() {
             </Button>
           </form>
 
+          <div className="mt-4 rounded-md border bg-muted/40 p-3 text-sm">
+            <p className="font-medium text-foreground mb-1">Judge demo account</p>
+            <p className="text-muted-foreground text-xs mb-2">
+              Pre-seeded SEV1 incident, AI summary, tasks, timeline, deployments.
+            </p>
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              className="w-full"
+              disabled={isLoading}
+              onClick={() => {
+                setEmail("demo@sentinel.io");
+                setPassword("Sentinel2026!");
+                setError("");
+              }}
+            >
+              Fill demo@sentinel.io credentials
+            </Button>
+          </div>
+
           <div className="mt-6 text-center text-sm text-muted-foreground">
             Don&apos;t have an account?{" "}
             <Link href="/register" className="text-primary hover:underline font-medium">

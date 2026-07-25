@@ -96,46 +96,56 @@ def _get_or_create_demo_user(db: Session, team: TeamModel) -> UserModel:
 
 
 def _ensure_service_health(db: Session, team_id: str, now: datetime | None = None) -> int:
-    """Idempotent service_health rows so Monitoring has a non-empty health grid."""
+    """Idempotent service_health rows so Monitoring has a non-empty health grid.
+
+    Never issues a full transaction rollback — only SAVEPOINT rollbacks — so a
+    partial schema never wipes incidents/deployments seeded earlier in the txn.
+    """
+    from sqlalchemy import text
+    import json as _json
+
     now = now or datetime.now(timezone.utc)
     try:
-        # Ensure table exists even when migrations were partial (soft-schema).
-        db.execute(
-            __import__("sqlalchemy", fromlist=["text"]).text(
-                """
-                CREATE TABLE IF NOT EXISTS service_health (
-                    id VARCHAR(36) PRIMARY KEY,
-                    team_id VARCHAR(36) NOT NULL,
-                    service_name VARCHAR(255) NOT NULL,
-                    status VARCHAR(32) NOT NULL DEFAULT 'unknown',
-                    uptime_percentage FLOAT,
-                    latency_ms INTEGER,
-                    last_check_at TIMESTAMP,
-                    next_check_at TIMESTAMP,
-                    metadata JSON,
-                    created_at TIMESTAMP,
-                    updated_at TIMESTAMP
-                )
-                """
-            )
-        )
-        db.flush()
-    except Exception as e:
-        logger.warning("Seed: service_health table ensure skipped (%s)", e)
-        try:
-            db.rollback()
-        except Exception:
-            pass
-        return 0
+        db.execute(text("SAVEPOINT sh_ensure"))
+    except Exception:
+        # Driver without savepoints — best-effort isolated path
+        pass
 
     try:
-        from sqlalchemy import text
+        try:
+            db.execute(text("SELECT 1 FROM service_health LIMIT 1"))
+        except Exception:
+            db.execute(text("ROLLBACK TO SAVEPOINT sh_ensure"))
+            db.execute(text("SAVEPOINT sh_ensure"))
+            db.execute(
+                text(
+                    """
+                    CREATE TABLE IF NOT EXISTS service_health (
+                        id VARCHAR(36) PRIMARY KEY,
+                        team_id VARCHAR(36) NOT NULL,
+                        service_name VARCHAR(255) NOT NULL,
+                        status VARCHAR(32) NOT NULL DEFAULT 'unknown',
+                        uptime_percentage FLOAT,
+                        latency_ms INTEGER,
+                        last_check_at TIMESTAMP,
+                        next_check_at TIMESTAMP,
+                        metadata JSON,
+                        created_at TIMESTAMP,
+                        updated_at TIMESTAMP
+                    )
+                    """
+                )
+            )
 
         existing = db.execute(
             text("SELECT COUNT(*) FROM service_health WHERE team_id = :tid"),
             {"tid": team_id},
         ).scalar()
         if existing and int(existing) > 0:
+            try:
+                db.execute(text("RELEASE SAVEPOINT sh_ensure"))
+            except Exception:
+                pass
             return int(existing)
 
         rows = [
@@ -145,6 +155,9 @@ def _ensure_service_health(db: Session, team_id: str, now: datetime | None = Non
             ("auth", "healthy", 99.9, 45),
             ("payments-worker", "down", 72.5, 0),
         ]
+        inserted = 0
+        # Prefer plain binds (sqlite + postgres text/varchar). Avoid enum CASTs
+        # that behave poorly under sqlite and can abort the statement.
         for name, status, uptime, latency in rows:
             db.execute(
                 text(
@@ -164,19 +177,70 @@ def _ensure_service_health(db: Session, team_id: str, now: datetime | None = Non
                     "status": status,
                     "uptime": uptime,
                     "latency": latency,
-                    "now": now,
-                    "meta": "{}",
+                    "now": now.replace(tzinfo=None) if now.tzinfo else now,
+                    "meta": _json.dumps({"seed": True}),
                 },
             )
+            inserted += 1
+        try:
+            db.execute(text("RELEASE SAVEPOINT sh_ensure"))
+        except Exception:
+            pass
         db.flush()
-        return len(rows)
+        return inserted
     except Exception as e:
         logger.warning("Seed: service_health rows skipped (%s)", e)
         try:
-            db.rollback()
+            db.execute(text("ROLLBACK TO SAVEPOINT sh_ensure"))
         except Exception:
             pass
         return 0
+
+
+def _ensure_sev1_channel_message(db: Session, team_id: str, user_id: str) -> None:
+    """Seed one coordination message on the open SEV1 channel for the war-room demo."""
+    try:
+        from src.backend.comms.service import CommsService
+        from src.backend.comms.models import Message
+
+        sev1 = (
+            db.query(Incident)
+            .filter(
+                Incident.team_id == team_id,
+                Incident.severity == SeverityLevel.SEV1.value,
+            )
+            .order_by(Incident.detected_at.desc())
+            .first()
+        )
+        if not sev1:
+            return
+        svc = CommsService(db)
+        channel = svc.get_or_create_channel_for_incident(
+            incident_id=str(sev1.id),
+            team_id=team_id,
+            incident_title=str(sev1.title),
+        )
+        existing = (
+            db.query(Message)
+            .filter(Message.channel_id == str(channel.id))
+            .count()
+        )
+        if existing > 0:
+            return
+        svc.post_message(
+            incident_id=str(sev1.id),
+            team_id=team_id,
+            author_id=user_id,
+            author_name="Demo User",
+            body=(
+                "Investigating payment cascade — DB pool exhausted after cache flush. "
+                "Raising pool size and watching error rate."
+            ),
+            author_type="user",
+            metadata={"seed": True},
+        )
+    except Exception as e:
+        logger.warning("Seed: SEV1 channel message skipped (%s)", e)
 
 
 def _ensure_deployments_and_commits(db: Session, team_id: str, now: datetime | None = None) -> int:
@@ -336,6 +400,7 @@ def ensure_demo_seed(db: Session) -> dict[str, Any]:
             existing_count += 1
         dep_n = _ensure_deployments_and_commits(db, team_id, now)
         health_n = _ensure_service_health(db, team_id, now)
+        _ensure_sev1_channel_message(db, team_id, str(user.id))
         db.commit()
         return {
             "status": "skipped",
@@ -496,6 +561,7 @@ def ensure_demo_seed(db: Session) -> dict[str, Any]:
 
     dep_n = _ensure_deployments_and_commits(db, team_id, now)
     health_n = _ensure_service_health(db, team_id, now)
+    _ensure_sev1_channel_message(db, team_id, str(user.id))
 
     db.commit()
     logger.info(

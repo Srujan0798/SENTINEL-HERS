@@ -35,16 +35,26 @@ export function StatusBar({ teamId }: StatusBarProps) {
 
     es.onopen = () => setState("connected");
     es.onerror = () => setState("disconnected");
-    es.onmessage = (e) => {
+    // Backend emits named SSE events: event: connected / channel.message / …
+    const onNamed = (e: MessageEvent) => {
+      setState("connected");
       try {
         const data = JSON.parse(e.data);
-        setLastEvent(data.event_type || "event");
+        setLastEvent(
+          (data && (data.event_type || data.type)) || e.type || "event"
+        );
       } catch {
-        // ignore malformed events
+        setLastEvent(e.type || "event");
       }
     };
+    es.addEventListener("connected", onNamed as EventListener);
+    es.addEventListener("channel.message", onNamed as EventListener);
+    es.addEventListener("ping", () => setState("connected"));
+    es.onmessage = onNamed;
 
     return () => {
+      es.removeEventListener("connected", onNamed as EventListener);
+      es.removeEventListener("channel.message", onNamed as EventListener);
       es.close();
       setState("disconnected");
     };
