@@ -17,6 +17,7 @@ import {
   type TimelineEvent,
 } from "@/lib/api";
 import { useUser } from "@/lib/auth";
+import { useRealtimeEvents } from "@/lib/realtime";
 import { ChatPanel } from "@/components/chat/ChatPanel";
 import { CommsPanel } from "@/components/comms/CommsPanel";
 import { VoiceRecorder } from "@/components/voice/VoiceRecorder";
@@ -159,6 +160,18 @@ export default function IncidentsPage() {
       cancelled = true;
     };
   }, [refreshIncidents, loadSummary, searchParams]);
+
+  // Live list/war-room refresh when another tab mutates incidents/tasks.
+  useRealtimeEvents(
+    ["incident.create", "incident.update", "incident.assign", "incident.escalate", "task.create", "task.update"],
+    () => {
+      void refreshIncidents().then((list) => {
+        if (!selected) return;
+        const fresh = list.find((i) => i.id === selected.id);
+        if (fresh) void loadWarRoom(fresh);
+      });
+    }
+  );
 
   // Live SLA countdown (1s tick) for the selected incident badge.
   // Depend only on incident_id so the interval is not reset every tick.
