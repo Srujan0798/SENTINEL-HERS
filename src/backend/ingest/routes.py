@@ -7,6 +7,7 @@ from pydantic import BaseModel, Field, field_validator
 from sqlalchemy.orm import Session
 
 from src.backend.auth.dependencies import get_current_user_dependency
+from src.backend.rbac.dependencies import require_permission
 from src.backend.logs.database import get_db
 from src.backend.logs.models import (
     Alert,
@@ -58,6 +59,7 @@ async def ingest_logs(
     body: BulkLogIngestRequest,
     db: Session = Depends(get_db),
     current_user: dict = Depends(get_current_user_dependency),
+    _rbac=Depends(require_permission("logs:write")),
 ):
     team_id = current_user["team_id"]
     now = datetime.now(timezone.utc)
@@ -101,6 +103,7 @@ async def create_alert(
     body: AlertCreate,
     db: Session = Depends(get_db),
     current_user: dict = Depends(get_current_user_dependency),
+    _rbac=Depends(require_permission("logs:write")),
 ):
     team_id = current_user["team_id"]
     now = datetime.now(timezone.utc)
