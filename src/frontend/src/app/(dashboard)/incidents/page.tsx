@@ -131,10 +131,11 @@ export default function IncidentsPage() {
           ))}
         </div>
 
-        {/* Detail panel */}
+        {/* Detail panel — not sticky: a stuck card overlapped the chat's
+            Send button below it (later siblings scroll under a sticky element). */}
         <div>
           {selected ? (
-            <Card className="sticky top-24">
+            <Card>
               <CardHeader>
                 <CardTitle className="text-base">{selected.title}</CardTitle>
               </CardHeader>
