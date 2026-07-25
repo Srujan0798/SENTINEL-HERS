@@ -38,3 +38,4 @@ attic/
 .DS_Store
 Thumbs.db
 .env.credentials
+echo .playwright-cli
