@@ -34,14 +34,15 @@ const STATUS_BADGE: Record<string, "default" | "secondary" | "destructive" | "ou
   closed: "outline",
 };
 
-const STATUS_OPTIONS: Incident["status"][] = [
-  "detected",
-  "triaging",
-  "investigating",
-  "mitigating",
-  "resolved",
-  "closed",
-];
+/** Mirrors backend VALID_TRANSITIONS — only legal next steps (avoids 422 dead-ends). */
+const NEXT_STATUS: Record<Incident["status"], Incident["status"][]> = {
+  detected: ["triaging"],
+  triaging: ["investigating"],
+  investigating: ["mitigating"],
+  mitigating: ["resolved"],
+  resolved: ["closed"],
+  closed: [],
+};
 
 function formatSla(remaining: number, breached: boolean): string {
   const abs = Math.abs(remaining);
@@ -342,15 +343,27 @@ export default function IncidentsPage() {
                   <select
                     className="w-full h-9 rounded-md border bg-background px-2 text-sm"
                     value={selected.status}
-                    disabled={actionBusy}
+                    disabled={actionBusy || (NEXT_STATUS[selected.status] || []).length === 0}
                     onChange={(e) => updateStatus(e.target.value as Incident["status"])}
                   >
-                    {STATUS_OPTIONS.map((s) => (
+                    <option value={selected.status}>{selected.status} (current)</option>
+                    {(NEXT_STATUS[selected.status] || []).map((s) => (
                       <option key={s} value={s}>
-                        {s}
+                        → {s}
                       </option>
                     ))}
                   </select>
+                  {(NEXT_STATUS[selected.status] || [])[0] && (
+                    <Button
+                      variant="secondary"
+                      size="sm"
+                      className="w-full"
+                      disabled={actionBusy}
+                      onClick={() => updateStatus((NEXT_STATUS[selected.status] || [])[0])}
+                    >
+                      Advance to {(NEXT_STATUS[selected.status] || [])[0]}
+                    </Button>
+                  )}
                   <Button
                     variant="default"
                     size="sm"
