@@ -144,11 +144,13 @@ export default function IncidentsPage() {
   }, [refreshIncidents, loadSummary]);
 
   // Live SLA countdown (1s tick) for the selected incident badge.
+  // Depend only on incident_id so the interval is not reset every tick.
+  const slaIncidentId = sla?.incident_id;
   useEffect(() => {
-    if (!sla) return;
+    if (!slaIncidentId) return;
     const id = window.setInterval(() => {
       setSla((prev) => {
-        if (!prev) return prev;
+        if (!prev || prev.incident_id !== slaIncidentId) return prev;
         const remaining_minutes = prev.remaining_minutes - 1 / 60;
         return {
           ...prev,
@@ -158,7 +160,7 @@ export default function IncidentsPage() {
       });
     }, 1000);
     return () => window.clearInterval(id);
-  }, [sla?.incident_id]);
+  }, [slaIncidentId]);
 
   async function generatePostmortem() {
     if (!selected) return;
@@ -382,16 +384,17 @@ export default function IncidentsPage() {
                     className="w-full"
                     onClick={async () => {
                       try {
+                        type RootCauseRow = {
+                          hypothesis?: string;
+                          cause?: string;
+                          confidence?: number;
+                          suggested_action?: string;
+                        };
                         const res = await api.post<{
-                          root_causes?: Array<{
-                            hypothesis?: string;
-                            cause?: string;
-                            confidence: number;
-                            suggested_action?: string;
-                          }>;
-                          suggestions?: Array<{ cause?: string; hypothesis?: string; confidence: number }>;
+                          root_causes?: RootCauseRow[];
+                          suggestions?: RootCauseRow[];
                         }>(`/api/ai/incidents/${selected.id}/root-causes`, {});
-                        const rows = res.root_causes || res.suggestions || [];
+                        const rows: RootCauseRow[] = res.root_causes || res.suggestions || [];
                         if (!rows.length) {
                           setAiSummary("No root-cause hypotheses returned.");
                           return;
