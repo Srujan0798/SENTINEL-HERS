@@ -1,4 +1,5 @@
 """AI endpoints — summary generation, root-cause analysis, conversational chat, and postmortem export."""
+import json
 import logging
 from typing import Any
 
@@ -268,6 +269,66 @@ async def ai_chat(
             status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
             detail=f"Chat unavailable: {exc}",
         )
+
+
+@router.post("/chat/stream")
+async def ai_chat_stream(
+    body: ChatRequest,
+    db: Session = Depends(get_db),
+    current_user: dict = Depends(get_current_user_dependency),
+):
+    """Streaming RAG chat via SSE — yields tokens as the AI generates them."""
+    from fastapi.responses import StreamingResponse
+    team_id = current_user["team_id"]
+
+    incidents = []
+    logs = []
+    if body.incident_id:
+        inc = db.query(Incident).filter(
+            Incident.id == body.incident_id,
+            Incident.team_id == team_id,
+        ).first()
+        if inc:
+            incidents.append(_serialize_incident(inc))
+            logs = _fetch_logs(db, body.incident_id)
+    else:
+        recent = db.query(Incident).filter(
+            Incident.team_id == team_id,
+        ).order_by(Incident.created_at.desc()).limit(10).all()
+        incidents = [_serialize_incident(i) for i in recent]
+
+    context, citations = _build_chat_context(incidents, logs)
+    system = (
+        "You are SENTINEL, an incident operations assistant. "
+        "Answer ONLY from the provided context. "
+        "Cite evidence with [log:id] or [incident:id] markers. "
+        "If context is insufficient, say so explicitly — never hallucinate."
+    )
+    messages = [{"role": "user", "content": f"Context:\n{context}\n\nQuestion: {body.question}"}]
+
+    def generate():
+        try:
+            from src.backend.ai.provider import get_provider
+            provider = get_provider()
+            for chunk in provider.stream_complete(messages, system=system):
+                yield f"data: {json.dumps({'chunk': chunk})}\n\n"
+            yield f"data: {json.dumps({'done': True})}\n\n"
+        except Exception as exc:
+            yield f"data: {json.dumps({'error': str(exc)})}\n\n"
+
+    return StreamingResponse(generate(), media_type="text/event-stream")
+
+
+def _build_chat_context(incidents: list[dict], logs: list[dict]) -> tuple[str, list]:
+    parts: list[str] = []
+    citations = []
+    for inc in incidents[:5]:
+        excerpt = f"Incident {inc.get('id','')} [{inc.get('severity','?')}]: {inc.get('title','')} — status: {inc.get('status','?')}"
+        parts.append(f"[incident:{inc.get('id','')}] {excerpt}")
+    for log in logs[:20]:
+        excerpt = f"[{log.get('level','?').upper()}] {log.get('service','?')}: {log.get('message','')}"
+        parts.append(f"[log:{log.get('id','')}] {excerpt}")
+    return "\n".join(parts), citations
 
 
 class PostmortemResponse(BaseModel):

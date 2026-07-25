@@ -45,3 +45,4 @@ requests>=2.31.0
 pytest>=8
 pytest-asyncio
 slowapi
+alembic

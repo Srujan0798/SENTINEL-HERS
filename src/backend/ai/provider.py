@@ -37,6 +37,10 @@ class AIProvider(ABC):
     def complete(self, messages: list[dict[str, str]], system: str = "") -> str:
         """Send messages and return the assistant response text."""
 
+    def stream_complete(self, messages: list[dict[str, str]], system: str = ""):
+        """Yield response text chunks. Default: yield full complete() output."""
+        yield self.complete(messages, system=system)
+
 
 def _claude_model() -> str:
     # AI_MODEL is the canonical knob; CLAUDE_MODEL kept for backward compat.
@@ -146,6 +150,27 @@ class OpenRouterProvider(AIProvider):
             return response.choices[0].message.content or ""
         except Exception as exc:
             raise AIProviderError(f"OpenRouter call failed: {exc}") from exc
+
+    def stream_complete(self, messages: list[dict[str, str]], system: str = ""):
+        openai_messages = []
+        if system:
+            openai_messages.append({"role": "system", "content": system})
+        for m in messages:
+            role = "assistant" if m["role"] == "assistant" else m["role"]
+            openai_messages.append({"role": role, "content": m["content"]})
+        try:
+            stream = self._client.chat.completions.create(
+                model=self._model,
+                messages=openai_messages,
+                max_tokens=2048,
+                stream=True,
+            )
+            for chunk in stream:
+                delta = chunk.choices[0].delta.content
+                if delta:
+                    yield delta
+        except Exception as exc:
+            raise AIProviderError(f"OpenRouter stream failed: {exc}") from exc
 
 
 class NvidiaProvider(AIProvider):

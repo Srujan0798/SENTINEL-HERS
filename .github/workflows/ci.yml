@@ -39,3 +39,32 @@ jobs:
         env:
           NEXT_PUBLIC_API_BASE_URL: https://example.test
         run: npm run build
+
+  playwright:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+      - name: Install dependencies
+        working-directory: src/frontend
+        run: npm ci
+      - name: Install Playwright browsers
+        working-directory: src/frontend
+        run: npx playwright install --with-deps chromium
+      - name: Run Playwright tests
+        working-directory: src/frontend
+        run: npx playwright test --reporter=line
+        env:
+          PLAYWRIGHT_BASE_URL: https://sentinel-hers.vercel.app
+        continue-on-error: true
+
+  live-verify:
+    runs-on: ubuntu-latest
+    if: github.ref == 'refs/heads/main'
+    steps:
+      - uses: actions/checkout@v4
+      - name: Verify live deployment
+        run: bash scripts/verify_live.sh
+        continue-on-error: true

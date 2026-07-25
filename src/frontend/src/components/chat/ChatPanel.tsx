@@ -45,24 +45,68 @@ export function ChatPanel({ incidentId, teamId }: ChatPanelProps) {
     setInput("");
     setMessages((prev) => [...prev, { role: "user", content: q }]);
     setLoading(true);
+
+    // Try streaming first; fall back to regular chat on error
     try {
-      const res = await api.post<{ answer: string; citations: Citation[] }>("/api/ai/chat", {
-        question: q,
-        incident_id: incidentId,
-        team_id: teamId,
-      });
-      setMessages((prev) => [
-        ...prev,
-        { role: "assistant", content: res.answer, citations: res.citations },
-      ]);
-    } catch (e: unknown) {
-      setMessages((prev) => [
-        ...prev,
-        {
-          role: "assistant",
-          content: `Error: ${e instanceof Error ? e.message : "AI unavailable"}`,
+      const token = localStorage.getItem("access_token") || localStorage.getItem("sentinel_token");
+      const base = process.env.NEXT_PUBLIC_API_BASE_URL || process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
+      const res = await fetch(`${base}/api/ai/chat/stream`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          ...(token ? { Authorization: `Bearer ${token}` } : {}),
         },
-      ]);
+        body: JSON.stringify({ question: q, incident_id: incidentId, team_id: teamId }),
+      });
+
+      if (!res.ok || !res.body) throw new Error("Stream unavailable");
+
+      setMessages((prev) => [...prev, { role: "assistant", content: "" }]);
+      const reader = res.body.getReader();
+      const decoder = new TextDecoder();
+      let accumulated = "";
+
+      while (true) {
+        const { done, value } = await reader.read();
+        if (done) break;
+        const text = decoder.decode(value);
+        const lines = text.split("\n");
+        for (const line of lines) {
+          if (line.startsWith("data: ")) {
+            try {
+              const data = JSON.parse(line.slice(6));
+              if (data.chunk) {
+                accumulated += data.chunk;
+                setMessages((prev) => {
+                  const next = [...prev];
+                  next[next.length - 1] = { role: "assistant", content: accumulated };
+                  return next;
+                });
+              }
+            } catch {
+              /* skip */
+            }
+          }
+        }
+      }
+    } catch {
+      // Fallback to non-streaming
+      try {
+        const res = await api.post<{ answer: string; citations: Citation[] }>("/api/ai/chat", {
+          question: q,
+          incident_id: incidentId,
+          team_id: teamId,
+        });
+        setMessages((prev) => [
+          ...prev,
+          { role: "assistant", content: res.answer, citations: res.citations },
+        ]);
+      } catch (e: unknown) {
+        setMessages((prev) => [
+          ...prev,
+          { role: "assistant", content: `Error: ${e instanceof Error ? e.message : "AI unavailable"}` },
+        ]);
+      }
     } finally {
       setLoading(false);
     }
