@@ -1,10 +1,12 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import Link from "next/link";
 import { useUser, useRole } from "@/lib/auth";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { api, AnalyticsSummary, Incident } from "@/lib/api";
+import { Button } from "@/components/ui/button";
+import { api, AnalyticsSummary, Incident, type SlaStatus } from "@/lib/api";
 
 function timeAgo(dateStr: string): string {
   const diff = Date.now() - new Date(dateStr).getTime();
@@ -38,27 +40,46 @@ export default function DashboardPage() {
   const role = useRole();
   const [summary, setSummary] = useState<AnalyticsSummary | null>(null);
   const [incidents, setIncidents] = useState<Incident[]>([]);
+  const [slaRows, setSlaRows] = useState<SlaStatus[]>([]);
 
   useEffect(() => {
     api.get<AnalyticsSummary>("/api/analytics/incidents/summary").then(setSummary);
     api.get<{ data: Incident[] }>("/api/incidents").then((res) => setIncidents(res.data));
+    api.get<SlaStatus[]>("/api/sla").then((rows) => setSlaRows(Array.isArray(rows) ? rows : [])).catch(() => setSlaRows([]));
   }, []);
 
   const totalIncidents = summary?.total_incidents ?? 0;
-  const sev1Active = summary?.by_severity?.SEV1 ?? 0;
+  const sev1Active =
+    incidents.filter((i) => i.severity === "SEV1" && i.status !== "resolved" && i.status !== "closed")
+      .length ||
+    summary?.by_severity?.SEV1 ||
+    0;
   const mttr = summary?.mttr_minutes ?? 0;
-  const sla =
-    summary && summary.total_incidents > 0
+  const openSla = slaRows.length;
+  const breached = slaRows.filter((s) => s.breached).length;
+  // Honest SLA face: among open incidents tracked by /api/sla, % not breached.
+  const slaCompliance =
+    openSla > 0 ? Math.round(((openSla - breached) / openSla) * 100) : summary && summary.total_incidents > 0
       ? Math.round((summary.resolved_incidents / summary.total_incidents) * 100)
       : 0;
+  const openSev1 = incidents.find(
+    (i) => i.severity === "SEV1" && i.status !== "resolved" && i.status !== "closed"
+  );
 
   return (
     <div className="space-y-6">
-      <div>
-        <h1 className="text-3xl font-bold tracking-tight">Dashboard</h1>
-        <p className="text-muted-foreground mt-1">
-          Welcome back, {user?.name}. You are signed in as <strong>{role}</strong>.
-        </p>
+      <div className="flex flex-col sm:flex-row sm:items-end sm:justify-between gap-3">
+        <div>
+          <h1 className="text-3xl font-bold tracking-tight">Dashboard</h1>
+          <p className="text-muted-foreground mt-1">
+            Welcome back, {user?.name}. You are signed in as <strong>{role}</strong>.
+          </p>
+        </div>
+        {openSev1 && (
+          <Button asChild variant="destructive" size="sm">
+            <Link href="/incidents">Open SEV1 war room →</Link>
+          </Button>
+        )}
       </div>
 
       <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
@@ -69,7 +90,7 @@ export default function DashboardPage() {
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold">{totalIncidents}</div>
-            <p className="text-xs text-muted-foreground">Active incidents</p>
+            <p className="text-xs text-muted-foreground">Last 7 days</p>
           </CardContent>
         </Card>
 
@@ -86,7 +107,7 @@ export default function DashboardPage() {
 
         <Card>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">MTTR (24h)</CardTitle>
+            <CardTitle className="text-sm font-medium">MTTR</CardTitle>
             <Badge variant="info">Avg</Badge>
           </CardHeader>
           <CardContent>
@@ -97,41 +118,61 @@ export default function DashboardPage() {
 
         <Card>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">SLA Compliance</CardTitle>
-            <Badge variant="success">On Track</Badge>
+            <CardTitle className="text-sm font-medium">Open SLA</CardTitle>
+            <Badge variant={breached > 0 ? "destructive" : "success"}>
+              {breached > 0 ? `${breached} breached` : "On Track"}
+            </Badge>
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">{sla}%</div>
-            <p className="text-xs text-muted-foreground">Within target</p>
+            <div className="text-2xl font-bold">{slaCompliance}%</div>
+            <p className="text-xs text-muted-foreground">
+              {openSla > 0
+                ? `${openSla - breached}/${openSla} open within SLA`
+                : "No open SLA timers"}
+            </p>
           </CardContent>
         </Card>
       </div>
 
       <Card>
-        <CardHeader>
+        <CardHeader className="flex flex-row items-center justify-between">
           <CardTitle>Recent Incidents</CardTitle>
+          <Button asChild variant="ghost" size="sm">
+            <Link href="/incidents">View all</Link>
+          </Button>
         </CardHeader>
         <CardContent>
           <div className="space-y-4">
             {incidents.length === 0 ? (
               <p className="text-sm text-muted-foreground py-4 text-center">No recent incidents.</p>
             ) : (
-              incidents.slice(0, 3).map((inc) => (
-                <div
-                  key={inc.id}
-                  className="flex items-center justify-between p-4 border rounded-lg"
-                >
-                  <div>
-                    <p className="font-medium">{inc.title}</p>
-                    <p className="text-sm text-muted-foreground">
-                      {inc.assigned_to ?? "unassigned"} &bull; {timeAgo(inc.created_at)}
-                    </p>
-                  </div>
-                  <Badge variant={severityVariant[inc.severity] ?? "secondary"}>
-                    {inc.severity}
-                  </Badge>
-                </div>
-              ))
+              incidents.slice(0, 5).map((inc) => {
+                const sla = slaRows.find((s) => s.incident_id === inc.id);
+                return (
+                  <Link
+                    key={inc.id}
+                    href="/incidents"
+                    className="flex items-center justify-between p-4 border rounded-lg hover:ring-2 hover:ring-primary transition-all"
+                  >
+                    <div className="min-w-0">
+                      <p className="font-medium truncate">{inc.title}</p>
+                      <p className="text-sm text-muted-foreground">
+                        {inc.status}
+                        {" · "}
+                        {inc.assigned_to ? "assigned" : "unassigned"}
+                        {" · "}
+                        {timeAgo(inc.detected_at || inc.created_at)}
+                        {sla
+                          ? ` · SLA ${sla.breached ? "BREACHED" : `${Math.round(sla.remaining_minutes)}m left`}`
+                          : ""}
+                      </p>
+                    </div>
+                    <Badge variant={severityVariant[inc.severity] ?? "secondary"}>
+                      {inc.severity}
+                    </Badge>
+                  </Link>
+                );
+              })
             )}
           </div>
         </CardContent>

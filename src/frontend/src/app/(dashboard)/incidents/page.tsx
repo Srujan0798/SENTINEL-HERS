@@ -44,13 +44,16 @@ const STATUS_OPTIONS: Incident["status"][] = [
 ];
 
 function formatSla(remaining: number, breached: boolean): string {
-  if (breached) {
-    const over = Math.abs(remaining);
-    if (over >= 60) return `BREACHED ${Math.floor(over / 60)}h ${Math.round(over % 60)}m`;
-    return `BREACHED ${Math.round(over)}m`;
-  }
-  if (remaining >= 60) return `${Math.floor(remaining / 60)}h ${Math.round(remaining % 60)}m left`;
-  return `${Math.round(remaining)}m left`;
+  const abs = Math.abs(remaining);
+  const h = Math.floor(abs / 60);
+  const m = Math.floor(abs % 60);
+  const s = Math.floor((abs * 60) % 60);
+  const clock =
+    h > 0
+      ? `${h}h ${m.toString().padStart(2, "0")}m`
+      : `${m}m ${s.toString().padStart(2, "0")}s`;
+  if (breached || remaining < 0) return `BREACHED ${clock}`;
+  return `${clock} left`;
 }
 
 export default function IncidentsPage() {
@@ -77,10 +80,6 @@ export default function IncidentsPage() {
     return res.data;
   }, []);
 
-  useEffect(() => {
-    refreshIncidents().finally(() => setLoading(false));
-  }, [refreshIncidents]);
-
   const loadWarRoom = useCallback(async (inc: Incident) => {
     setWarLoading(true);
     setActionError(null);
@@ -102,20 +101,64 @@ export default function IncidentsPage() {
     }
   }, []);
 
-  async function loadSummary(inc: Incident) {
-    setSelected(inc);
-    setAiSummary(null);
-    setAiLoading(true);
-    void loadWarRoom(inc);
-    try {
-      const res = await api.get<{ summary: string }>(`/api/ai/incidents/${inc.id}/summary`);
-      setAiSummary(res.summary);
-    } catch {
-      setAiSummary("AI summary unavailable.");
-    } finally {
-      setAiLoading(false);
-    }
-  }
+  const loadSummary = useCallback(
+    async (inc: Incident) => {
+      setSelected(inc);
+      setAiSummary(null);
+      setAiLoading(true);
+      void loadWarRoom(inc);
+      try {
+        const res = await api.get<{ summary: string }>(`/api/ai/incidents/${inc.id}/summary`);
+        setAiSummary(res.summary);
+      } catch {
+        setAiSummary("AI summary unavailable.");
+      } finally {
+        setAiLoading(false);
+      }
+    },
+    [loadWarRoom]
+  );
+
+  // Demo path: auto-open open SEV1 (or first incident) so judges land in the war room.
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      try {
+        const list = await refreshIncidents();
+        if (cancelled) return;
+        const sev1 =
+          list.find(
+            (i) =>
+              i.severity === "SEV1" && i.status !== "resolved" && i.status !== "closed"
+          ) ||
+          list.find((i) => i.severity === "SEV1") ||
+          list[0];
+        if (sev1) await loadSummary(sev1);
+      } finally {
+        if (!cancelled) setLoading(false);
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [refreshIncidents, loadSummary]);
+
+  // Live SLA countdown (1s tick) for the selected incident badge.
+  useEffect(() => {
+    if (!sla) return;
+    const id = window.setInterval(() => {
+      setSla((prev) => {
+        if (!prev) return prev;
+        const remaining_minutes = prev.remaining_minutes - 1 / 60;
+        return {
+          ...prev,
+          remaining_minutes,
+          breached: remaining_minutes < 0,
+        };
+      });
+    }, 1000);
+    return () => window.clearInterval(id);
+  }, [sla?.incident_id]);
 
   async function generatePostmortem() {
     if (!selected) return;
