@@ -68,7 +68,7 @@ async def list_tasks(
         Task.incident_id == str(incident_id),
         Task.team_id == team_id,
     ).order_by(Task.created_at.asc()).all()
-    return [_task_dict(r) for r in rows]
+    return {"data": [_task_dict(r) for r in rows]}
 
 
 @router.patch("/api/tasks/{task_id}")
