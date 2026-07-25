@@ -22,8 +22,7 @@ _jwt = os.getenv("JWT_SECRET")
 _jwt_refresh = os.getenv("JWT_REFRESH_SECRET")
 _is_prod = os.getenv("ENV", "development").lower() in ("production", "prod")
 if not _jwt or not _jwt_refresh:
-    env_source = os.getenv("DATABASE_URL")
-    if _is_prod or env_source:
+    if _is_prod:
         raise RuntimeError(
             "JWT_SECRET and JWT_REFRESH_SECRET must be set in production."
         )

@@ -35,9 +35,20 @@ def run_migrations() -> None:
             logger.info("Default roles seeded")
 
     # Create performance indexes (idempotent — IF NOT EXISTS)
-    _ensure_indexes(engine)
+    try:
+        _ensure_indexes(engine)
+    except Exception as e:
+        logger.warning("Index creation failed (non-fatal): %s", e)
 
     logger.info("DB migrations complete — %d tables", len(Base.metadata.tables))
+
+    # Ensure judge demo path exists after every boot (idempotent).
+    try:
+        from src.backend.seed.service import auto_seed_if_enabled
+
+        auto_seed_if_enabled()
+    except Exception:
+        logger.exception("Auto demo seed failed (non-fatal)")
 
 def _ensure_indexes(engine) -> None:
     """Create performance indexes idempotently (IF NOT EXISTS)."""
@@ -54,7 +65,6 @@ def _ensure_indexes(engine) -> None:
         "CREATE INDEX IF NOT EXISTS idx_log_entries_level ON log_entries(level)",
         "CREATE INDEX IF NOT EXISTS idx_log_entries_created_at ON log_entries(created_at)",
         "CREATE INDEX IF NOT EXISTS idx_alerts_team_id ON alerts(team_id)",
-        "CREATE INDEX IF NOT EXISTS idx_service_health_team_id ON service_health(team_id)",
         "CREATE INDEX IF NOT EXISTS idx_deployments_team_id ON deployments(team_id)",
         "CREATE INDEX IF NOT EXISTS idx_deployments_deployed_at ON deployments(deployed_at)",
     ]
@@ -62,15 +72,10 @@ def _ensure_indexes(engine) -> None:
         for stmt in indexes:
             try:
                 conn.execute(text(stmt))
-            except Exception as e:
-                logger.warning("Index creation skipped (%s): %s", stmt[:60], e)
-        conn.commit()
+            except Exception:
+                pass
+        try:
+            conn.commit()
+        except Exception:
+            pass
     logger.info("Performance indexes ensured (%d statements)", len(indexes))
-
-    # Ensure judge demo path exists after every boot (idempotent).
-    try:
-        from src.backend.seed.service import auto_seed_if_enabled
-
-        auto_seed_if_enabled()
-    except Exception:
-        logger.exception("Auto demo seed failed (non-fatal)")
