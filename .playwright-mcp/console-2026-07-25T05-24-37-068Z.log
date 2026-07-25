@@ -1,8 +1,0 @@
-[    2591ms] [ERROR] Failed to load resource: the server responded with a status of 401 () @ https://sentinel-api-clu9.onrender.com/api/analytics/incidents/summary:0
-[    2591ms] [ERROR] Failed to load resource: the server responded with a status of 401 () @ https://sentinel-api-clu9.onrender.com/auth/me:0
-[    2592ms] [ERROR] Failed to load resource: the server responded with a status of 401 () @ https://sentinel-api-clu9.onrender.com/api/incidents:0
-[    2600ms] Error: User not found
-    at s (https://sentinel-hers.vercel.app/_next/static/chunks/app/(dashboard)/dashboard/page-ce715b0b7e3b8574.js:1:459)
-[    2600ms] Error: User not found
-    at s (https://sentinel-hers.vercel.app/_next/static/chunks/app/(dashboard)/dashboard/page-ce715b0b7e3b8574.js:1:459)
-[    3083ms] [ERROR] Failed to load resource: the server responded with a status of 401 () @ https://sentinel-api-clu9.onrender.com/auth/refresh:0
