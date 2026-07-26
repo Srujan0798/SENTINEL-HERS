@@ -290,6 +290,23 @@ export function CommsPanel({
     [draft]
   );
 
+  const sendMessage = useCallback(async () => {
+    const body = draft.trim();
+    if (!body) return;
+    setError(null);
+    try {
+      const m = await apiPost<Message>(`/api/incidents/${incidentId}/messages`, {
+        body,
+        author_type: "user",
+        metadata: {},
+      });
+      setMessages((prev) => (prev.some((x) => x.id === m.id) ? prev : [...prev, m]));
+      setDraft("");
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Failed to send");
+    }
+  }, [draft, incidentId]);
+
   const handleKeyDown = useCallback(
     (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
       if (autocomplete.open && filteredMembers.length > 0) {
@@ -321,25 +338,8 @@ export function CommsPanel({
         void sendMessage();
       }
     },
-    [autocomplete, filteredMembers, insertMention]
+    [autocomplete, filteredMembers, insertMention, sendMessage]
   );
-
-  const sendMessage = useCallback(async () => {
-    const body = draft.trim();
-    if (!body) return;
-    setError(null);
-    try {
-      const m = await apiPost<Message>(`/api/incidents/${incidentId}/messages`, {
-        body,
-        author_type: "user",
-        metadata: {},
-      });
-      setMessages((prev) => (prev.some((x) => x.id === m.id) ? prev : [...prev, m]));
-      setDraft("");
-    } catch (e) {
-      setError(e instanceof Error ? e.message : "Failed to send");
-    }
-  }, [draft, incidentId]);
 
   const loadMore = useCallback(async () => {
     if (!pagination || page >= pagination.total_pages) return;

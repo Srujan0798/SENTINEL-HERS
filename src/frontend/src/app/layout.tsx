@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import { AuthProvider } from "@/lib/auth";
 import { WakingOverlay } from "@/components/WakingOverlay";
+import { Toaster } from "@/components/ui/toast";
 import "./globals.css";
 
 export const metadata: Metadata = {
@@ -18,6 +19,7 @@ export default function RootLayout({
     <html lang="en" className="h-full dark">
       <body className="min-h-full flex flex-col antialiased">
         <AuthProvider><WakingOverlay>{children}</WakingOverlay></AuthProvider>
+        <Toaster />
       </body>
     </html>
   );

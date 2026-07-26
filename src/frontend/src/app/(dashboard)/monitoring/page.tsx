@@ -4,6 +4,8 @@ import { useEffect, useState } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import { Skeleton } from "@/components/ui/skeleton";
+import { AlertTriangle, Activity, Container, Server } from "lucide-react";
 import { api, type Alert, type LogEntry } from "@/lib/api";
 
 interface Container {
@@ -45,6 +47,13 @@ function alertBody(a: Alert): string {
   return a.description || a.message || a.alert_type || "";
 }
 
+function sevBadgeVariant(severity: string): "destructive" | "warning" | "secondary" {
+  const sev = (severity || "").toUpperCase();
+  if (sev === "SEV1" || sev === "CRITICAL") return "destructive";
+  if (sev === "SEV2") return "warning";
+  return "secondary";
+}
+
 export default function MonitoringPage() {
   const [alerts, setAlerts] = useState<Alert[]>([]);
   const [containers, setContainers] = useState<ContainersResponse>({
@@ -59,8 +68,6 @@ export default function MonitoringPage() {
   const [resolving, setResolving] = useState<string | null>(null);
 
   async function load() {
-    // Containers can hang when Docker socket is missing — race with a short timeout
-    // so alerts/service health still paint for judges.
     const containersPromise = Promise.race([
       api.get<ContainersResponse>("/api/integrations/containers"),
       new Promise<ContainersResponse>((resolve) =>
@@ -123,7 +130,44 @@ export default function MonitoringPage() {
   const openAlerts = alerts.filter((a) => !a.is_resolved && a.status !== "resolved");
 
   if (loading) {
-    return <div className="flex items-center justify-center h-64 text-muted-foreground">Loading...</div>;
+    return (
+      <div className="space-y-6">
+        <div>
+          <Skeleton className="h-8 w-48" />
+          <Skeleton className="h-4 w-72 mt-2" />
+        </div>
+        <Card>
+          <CardHeader>
+            <Skeleton className="h-5 w-40" />
+          </CardHeader>
+          <CardContent className="space-y-3">
+            {Array.from({ length: 3 }).map((_, i) => (
+              <Skeleton key={i} className="h-16 w-full rounded-lg" />
+            ))}
+          </CardContent>
+        </Card>
+        <Card>
+          <CardHeader>
+            <Skeleton className="h-5 w-40" />
+          </CardHeader>
+          <CardContent>
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+              {Array.from({ length: 3 }).map((_, i) => (
+                <Skeleton key={i} className="h-24 w-full rounded-lg" />
+              ))}
+            </div>
+          </CardContent>
+        </Card>
+        <Card>
+          <CardHeader>
+            <Skeleton className="h-5 w-40" />
+          </CardHeader>
+          <CardContent>
+            <Skeleton className="h-48 w-full rounded-lg" />
+          </CardContent>
+        </Card>
+      </div>
+    );
   }
 
   return (
@@ -139,12 +183,17 @@ export default function MonitoringPage() {
         </CardHeader>
         <CardContent>
           {alerts.length === 0 ? (
-            <p className="text-muted-foreground text-sm">No alerts.</p>
+            <div className="flex flex-col items-center justify-center py-12 text-center">
+              <AlertTriangle className="h-10 w-10 text-muted-foreground/40 mb-3" />
+              <p className="text-muted-foreground text-sm font-medium">No alerts</p>
+              <p className="text-muted-foreground/60 text-xs mt-1">
+                All systems operational. No active alerts to display.
+              </p>
+            </div>
           ) : (
             <div className="space-y-2">
               {alerts.map((alert) => {
                 const resolved = alert.is_resolved || alert.status === "resolved";
-                const sev = (alert.severity || "").toUpperCase();
                 return (
                   <div
                     key={alert.id}
@@ -162,7 +211,7 @@ export default function MonitoringPage() {
                       </p>
                     </div>
                     <div className="flex items-center gap-2 shrink-0">
-                      <Badge variant={sev === "SEV1" || sev === "CRITICAL" ? "destructive" : "secondary"}>
+                      <Badge variant={sevBadgeVariant(alert.severity)}>
                         {alert.severity}
                       </Badge>
                       {resolved ? (
@@ -173,6 +222,7 @@ export default function MonitoringPage() {
                           variant="outline"
                           disabled={resolving === alert.id}
                           onClick={() => resolveAlert(alert.id)}
+                          className="min-h-[44px] min-w-[44px] sm:min-h-0 sm:min-w-0"
                         >
                           {resolving === alert.id ? "…" : "Resolve"}
                         </Button>
@@ -192,10 +242,14 @@ export default function MonitoringPage() {
         </CardHeader>
         <CardContent>
           {services.length === 0 ? (
-            <p className="text-muted-foreground text-sm">
-              No registered services yet. Demo seed will populate service health after the next backend
-              deploy.
-            </p>
+            <div className="flex flex-col items-center justify-center py-12 text-center">
+              <Activity className="h-10 w-10 text-muted-foreground/40 mb-3" />
+              <p className="text-muted-foreground text-sm font-medium">No services registered</p>
+              <p className="text-muted-foreground/60 text-xs mt-1 max-w-md">
+                No registered services yet. Demo seed will populate service health after the next backend
+                deploy.
+              </p>
+            </div>
           ) : (
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
               {services.map((s) => {
@@ -230,7 +284,13 @@ export default function MonitoringPage() {
         </CardHeader>
         <CardContent>
           {recentLogs.length === 0 ? (
-            <p className="text-muted-foreground text-sm">No logs indexed yet.</p>
+            <div className="flex flex-col items-center justify-center py-12 text-center">
+              <Server className="h-10 w-10 text-muted-foreground/40 mb-3" />
+              <p className="text-muted-foreground text-sm font-medium">No logs indexed yet</p>
+              <p className="text-muted-foreground/60 text-xs mt-1">
+                Logs will appear here once the backend indexes them.
+              </p>
+            </div>
           ) : (
             <div className="space-y-2">
               {recentLogs.map((log) => (
@@ -287,10 +347,14 @@ export default function MonitoringPage() {
             </div>
 
             {allContainers.length === 0 ? (
-              <p className="text-muted-foreground text-sm pt-2">
-                No live containers on this host (expected on managed PaaS). Service health + alerts above
-                are the judge-facing monitoring path.
-              </p>
+              <div className="flex flex-col items-center justify-center py-10 text-center">
+                <Container className="h-10 w-10 text-muted-foreground/40 mb-3" />
+                <p className="text-muted-foreground text-sm font-medium">No live containers</p>
+                <p className="text-muted-foreground/60 text-xs mt-1 max-w-md">
+                  No live containers on this host (expected on managed PaaS). Service health + alerts above
+                  are the judge-facing monitoring path.
+                </p>
+              </div>
             ) : (
               <div className="overflow-x-auto">
                 <table className="w-full text-sm">

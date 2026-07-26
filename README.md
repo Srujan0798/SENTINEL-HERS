@@ -13,7 +13,7 @@
 **Problem statement:** Sentinel — AI Native Engineering Operations Platform (Hard).  
 Brief: [ps.md](ps.md) · Architecture: [plan/ARCHITECTURE.md](plan/ARCHITECTURE.md) · Write-up: [WRITEUP.md](WRITEUP.md)
 
-![status](https://img.shields.io/badge/tests-183%20passing-brightgreen)
+![status](https://img.shields.io/badge/tests-169%20passing-brightgreen)
 ![backend](https://img.shields.io/badge/backend-FastAPI-009688)
 ![frontend](https://img.shields.io/badge/frontend-Next.js%2015-black)
 ![deploy](https://img.shields.io/badge/deploy-Render%20%2B%20Vercel-blue)

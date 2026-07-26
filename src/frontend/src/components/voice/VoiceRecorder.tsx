@@ -31,41 +31,6 @@ export function VoiceRecorder({
   const mediaRecorderRef = useRef<MediaRecorder | null>(null);
   const chunksRef = useRef<Blob[]>([]);
 
-  const startRecording = useCallback(async () => {
-    setError(null);
-    setTranscript(null);
-    setIncident(null);
-    setState("recording");
-
-    try {
-      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-      const mediaRecorder = new MediaRecorder(stream, {
-        mimeType: "audio/webm;codecs=opus",
-      });
-      mediaRecorderRef.current = mediaRecorder;
-      chunksRef.current = [];
-
-      mediaRecorder.ondataavailable = (e) => {
-        if (e.data.size > 0) chunksRef.current.push(e.data);
-      };
-
-      mediaRecorder.onstop = async () => {
-        stream.getTracks().forEach((t) => t.stop());
-        const blob = new Blob(chunksRef.current, { type: "audio/webm" });
-        await uploadAudio(blob);
-      };
-
-      mediaRecorder.start();
-    } catch {
-      setState("text-fallback");
-      setError("Microphone access denied. You can type your incident report below instead.");
-    }
-  }, []);
-
-  const stopRecording = useCallback(() => {
-    mediaRecorderRef.current?.stop();
-  }, []);
-
   const authHeaders = (): Record<string, string> => {
     if (typeof window === "undefined") return {};
     const token =
@@ -79,7 +44,7 @@ export function VoiceRecorder({
     process.env.NEXT_PUBLIC_API_URL ||
     "http://localhost:8000";
 
-  const uploadAudio = async (blob: Blob) => {
+  const uploadAudio = useCallback(async (blob: Blob) => {
     setState("uploading");
     try {
       const form = new FormData();
@@ -114,7 +79,42 @@ export function VoiceRecorder({
         setError(message);
       }
     }
-  };
+  }, [teamId, onIncidentCreated, resolvedBase]);
+
+  const startRecording = useCallback(async () => {
+    setError(null);
+    setTranscript(null);
+    setIncident(null);
+    setState("recording");
+
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      const mediaRecorder = new MediaRecorder(stream, {
+        mimeType: "audio/webm;codecs=opus",
+      });
+      mediaRecorderRef.current = mediaRecorder;
+      chunksRef.current = [];
+
+      mediaRecorder.ondataavailable = (e) => {
+        if (e.data.size > 0) chunksRef.current.push(e.data);
+      };
+
+      mediaRecorder.onstop = async () => {
+        stream.getTracks().forEach((t) => t.stop());
+        const blob = new Blob(chunksRef.current, { type: "audio/webm" });
+        await uploadAudio(blob);
+      };
+
+      mediaRecorder.start();
+    } catch {
+      setState("text-fallback");
+      setError("Microphone access denied. You can type your incident report below instead.");
+    }
+  }, [uploadAudio]);
+
+  const stopRecording = useCallback(() => {
+    mediaRecorderRef.current?.stop();
+  }, []);
 
   const submitTextFallback = async () => {
     if (!fallbackTitle.trim() && !fallbackText.trim()) {

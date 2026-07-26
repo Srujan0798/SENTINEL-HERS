@@ -8,7 +8,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Separator } from "@/components/ui/separator";
-import { Copy, Check, AlertCircle, Eye, EyeOff } from "lucide-react";
+import { Copy, AlertCircle, Eye, EyeOff } from "lucide-react";
 import { useAuth, formatApiError } from "@/lib/auth";
 
 const DEMO_EMAIL = "demo@sentinel.io";
@@ -70,7 +70,7 @@ function LoginForm() {
     void runLogin(DEMO_EMAIL, DEMO_PASSWORD);
   };
 
-  const copyToClipboard = (text: string, label: string) => {
+  const copyToClipboard = (text: string) => {
     navigator.clipboard.writeText(text);
   };
 
@@ -186,7 +186,7 @@ function LoginForm() {
                   variant="ghost"
                   size="icon"
                   className="h-6 w-6 p-0"
-                  onClick={() => copyToClipboard(DEMO_EMAIL, "Email")}
+                  onClick={() => copyToClipboard(DEMO_EMAIL)}
                   aria-label="Copy email"
                 >
                   <Copy className="h-3 w-3" />
@@ -199,7 +199,7 @@ function LoginForm() {
                   variant="ghost"
                   size="icon"
                   className="h-6 w-6 p-0"
-                  onClick={() => copyToClipboard(DEMO_PASSWORD, "Password")}
+                  onClick={() => copyToClipboard(DEMO_PASSWORD)}
                   aria-label="Copy password"
                 >
                   <Copy className="h-3 w-3" />

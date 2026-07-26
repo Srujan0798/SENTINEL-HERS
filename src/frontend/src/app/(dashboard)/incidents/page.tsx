@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useState } from "react";
+import { Skeleton } from "@/components/ui/skeleton";
 import { useSearchParams, useRouter } from "next/navigation";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -24,7 +25,7 @@ import { VoiceRecorder } from "@/components/voice/VoiceRecorder";
 
 const SEV_COLORS: Record<string, string> = {
   SEV1: "destructive",
-  SEV2: "secondary",
+  SEV2: "warning",
   SEV3: "secondary",
   SEV4: "outline",
 } as const;
@@ -309,15 +310,21 @@ export default function IncidentsPage() {
   );
 
   if (loading) return (
-    <div className="space-y-6">
-      <div className="h-8 w-48 bg-muted rounded animate-pulse" />
+    <div className="space-y-6 p-4 sm:p-0">
+      <div className="flex flex-col gap-2">
+        <Skeleton className="h-8 w-48" />
+        <Skeleton className="h-4 w-64" />
+      </div>
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         <div className="lg:col-span-2 space-y-3">
           {[1,2,3].map((i) => (
-            <div key={i} className="h-24 bg-muted rounded-lg animate-pulse" />
+            <Skeleton key={i} className="h-24 w-full rounded-lg" />
           ))}
         </div>
-        <div className="h-96 bg-muted rounded-lg animate-pulse" />
+        <div className="space-y-4">
+          <Skeleton className="h-96 w-full rounded-lg" />
+          <Skeleton className="h-48 w-full rounded-lg" />
+        </div>
       </div>
     </div>
   );
@@ -348,7 +355,7 @@ export default function IncidentsPage() {
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         {/* Incident list */}
-        <div className="lg:col-span-2 space-y-3">
+        <div className="lg:col-span-1 xl:col-span-1 space-y-3 order-2 lg:order-1">
           {incidents.length === 0 && (
             <Card>
               <CardContent className="py-12 text-center">
@@ -391,7 +398,7 @@ export default function IncidentsPage() {
                     </p>
                   </div>
                   <div className="flex flex-col gap-1 items-end shrink-0">
-                    <Badge variant={SEV_COLORS[inc.severity] as "destructive" | "secondary" | "outline" | "default"}>
+                    <Badge variant={SEV_COLORS[inc.severity] as "destructive" | "secondary" | "outline" | "default" | "warning"}>
                       {inc.severity}
                     </Badge>
                     <Badge variant={STATUS_BADGE[inc.status] || "default"}>{inc.status}</Badge>
@@ -406,7 +413,7 @@ export default function IncidentsPage() {
         </div>
 
         {/* Detail / war room */}
-        <div className="space-y-4">
+        <div className="lg:col-span-2 xl:col-span-2 space-y-4 order-1 lg:order-2 animate-in fade-in duration-300">
           {selected ? (
             <Card>
               <CardHeader>
@@ -414,7 +421,7 @@ export default function IncidentsPage() {
               </CardHeader>
               <CardContent className="space-y-4">
                 <div className="flex flex-wrap gap-2 items-center">
-                  <Badge variant={SEV_COLORS[selected.severity] as "destructive" | "secondary" | "outline" | "default"}>
+                  <Badge variant={SEV_COLORS[selected.severity] as "destructive" | "secondary" | "outline" | "default" | "warning"}>
                     {selected.severity}
                   </Badge>
                   <Badge variant={STATUS_BADGE[selected.status] || "default"}>{selected.status}</Badge>
