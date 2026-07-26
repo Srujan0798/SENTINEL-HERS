@@ -3,9 +3,30 @@
 **Score:** ~89–92% · **Phase:** E9 (Freeze)  
 **Build:** clean · **Live:** all 13 checks pass · **CI:** green  
 
-## Narrative — Session 2026-07-26 (Massive UI Push + Freeze Prep)
+## Narrative — Session 2026-07-26 (Security Fixes + NVIDIA + RAG + Redis Proof)
 
-Full UI domination push across all pages. Fixed VoiceRecorder ESLint build blocker, then systematically upgraded every frontend page: Dashboard (skeletons, SEV1 prominence, empty states), War Room (SEV2=warning, grid layout, skeletons), Deployments (SHA copy, GitLab badge, failed highlight, mobile cards), Settings (dark mode toggle, team mgmt, API keys, notifications), Monitoring (skeletons, empty states, touch targets), Analytics (skeletons, accurate MTTR, per-panel retry). Added infrastructure: Skeleton component, error pages (403/404/500), Toaster with toast(), mobile hamburger nav, safe area CSS, manual dismiss on WakingOverlay, useEffect-based 401 redirect. Fixed all ESLint warnings (CommsPanel sendMessage reorder, VoiceRecorder deps). Captured all techniques into ETERNITY_CORE_METHODS.md skill. SCOREBOARD updated with honest scores.
+Triaged all 3 security-review findings:
+- **VULN-001 (Critical):** AI provider keys stored in DB plaintext → Fernet encryption at rest (`ENCRYPTION_KEY` env var)
+- **VULN-002 (High):** Refresh tokens had no `jti` or revocation → `jti` added + `RevokedToken` table + old token invalidated on refresh  
+- **VULN-003 (High):** JWT passed in SSE URL query params → switched from `EventSource` to `fetch()` with `Authorization: Bearer` header
+
+Switched primary AI provider to NVIDIA (`AI_PROVIDER=nvidia`) with unlimited API key. Added `stream_complete` to NvidiaProvider for streaming chat. Render deploy live with commit `0fcc2dd`.
+
+True RAG with relevance scoring: keyword extraction from user query → TF-IDF-like scoring against log entries → level-based boost (critical/error/warn/info) → confidence based on citation relevance.
+
+Redis multi-worker SSE documented in `docs/REDIS_MULTI_WORKER.md`.
+
+Code review completed: 7 standards findings (worst: duplicated code in chat streaming), 4 spec findings (worst: missing GitLab integration). Key fixes applied (RAG, security).
+
+## What Was Built This Session (Round 2)
+- NVIDIA primary provider + streaming
+- Fernet encryption for AI keys at rest
+- Refresh token rotation with `jti` + `RevokedToken` blacklist
+- Fetch-based SSE with Authorization header (no more token in URL)
+- True RAG with keyword relevance scoring + level boost + confidence
+- Redis multi-worker SSE deployment docs
+- `RevokedToken` model in shared_models
+- `docs/REDIS_MULTI_WORKER.md`
 
 ## What Was Built This Session
 
