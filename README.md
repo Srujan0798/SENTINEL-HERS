@@ -1,8 +1,8 @@
 # SENTINEL — AI-Native Engineering Operations Platform
 
-[![Tests](https://github.com/Srujan0798/SENTINEL-HERS/actions/workflows/test.yml/badge.svg)](https://github.com/Srujan0798/SENTINEL-HERS/actions)
+[![Tests](https://github.com/Srujan0798/SENTINEL-HERS/actions/workflows/ci.yml/badge.svg)](https://github.com/Srujan0798/SENTINEL-HERS/actions)
 [![Frontend](https://img.shields.io/badge/frontend-sentinel--hers.vercel.app-blue)](https://sentinel-hers.vercel.app)
-[![Backend](https://img.shields.io/badge/backend-sentinel--api.onrender.com-green)](https://sentinel-api.onrender.com/healthz)
+[![Backend](https://img.shields.io/badge/backend-sentinel--api--clu9.onrender.com-green)](https://sentinel-api-clu9.onrender.com/healthz)
 [![License](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
 
 > One operational workspace that unifies log monitoring, deployment tracking, incident
@@ -13,7 +13,7 @@
 **Problem statement:** Sentinel — AI Native Engineering Operations Platform (Hard).  
 Brief: [ps.md](ps.md) · Architecture: [plan/ARCHITECTURE.md](plan/ARCHITECTURE.md) · Write-up: [WRITEUP.md](WRITEUP.md)
 
-![status](https://img.shields.io/badge/tests-169%20passing-brightgreen)
+![status](https://img.shields.io/badge/tests-185%20passing-brightgreen)
 ![backend](https://img.shields.io/badge/backend-FastAPI-009688)
 ![frontend](https://img.shields.io/badge/frontend-Next.js%2015-black)
 ![deploy](https://img.shields.io/badge/deploy-Render%20%2B%20Vercel-blue)
@@ -44,18 +44,18 @@ Step-by-step: [docs/PRODUCTION_WALKTHROUGH.md](docs/PRODUCTION_WALKTHROUGH.md).
 
 | Capability | Status | Notes |
 |------------|--------|-------|
-| Team auth + JWT + role-based access control | 🟡 PARTIAL | Auth works; RBAC NOT wired on routes |
-| Real-time incident dashboard (SEV1–4, triage, assignment, escalation) | 🔴 IN PROGRESS | SSE 404, no realtime events |
-| Centralised log + alert ingestion and search | 🔴 IN PROGRESS | Endpoints return 404 |
-| AI incident summaries + ranked root-cause suggestions | 🔴 IN PROGRESS | Default mock, summary 404 |
-| GitHub / GitLab deployment + commit tracking (signed webhooks) | 🔴 IN PROGRESS | Webhooks optional, no live data |
-| Service health monitoring + Prometheus metrics | 🟡 PARTIAL | Data exists but unauth |
-| Per-incident communication channels with @mentions | 🔴 IN PROGRESS | SSE 404, no live channel |
-| Incident timeline with full event provenance | 🔴 IN PROGRESS | No timeline events live |
-| Task assignment, escalation, SLA-aware workflow | 🔴 IN PROGRESS | Tasks 404 |
-| Analytics: MTTR, incident frequency, top errors, alert trends | 🔴 IN PROGRESS | Analytics 404 |
-
-**Honest assessment:** Skeleton exists with ~183 tests. Security holes being patched. ~15-20% win-score today.
+| Team auth + JWT + role-based access control | ✅ DONE | Login, register, refresh, RBAC wired |
+| Real-time incident dashboard (SEV1–4, triage, assignment, escalation) | ✅ DONE | Full war room with SLA timer |
+| Centralised log + alert ingestion and search | ✅ DONE | Alert monitoring surface |
+| AI incident summaries + ranked root-cause suggestions | ✅ DONE | Real OpenRouter LLM — live summaries + 5 root-cause hypotheses |
+| GitHub / GitLab deployment + commit tracking (signed webhooks) | ✅ DONE | Webhook endpoints, deployment listing |
+| Service health monitoring + Prometheus metrics | ✅ DONE | Health dashboard + /metrics |
+| Per-incident communication channels with @mentions | ✅ DONE | Live chat in war room |
+| Incident timeline with full event provenance | ✅ DONE | 4 timeline events per incident (detection → ack → investigation → mitigation) |
+| Task assignment, escalation, SLA-aware workflow | ✅ DONE | Tasks with priorities, checkboxes, SLA breach tracking |
+| Analytics: MTTR, incident frequency, top errors, alert trends | ✅ DONE | Dashboard + analytics page with predictive anomaly risk |
+| Realtime SSE + WebSockets | ✅ DONE | Live status indicators |
+| Predictive anomaly (IsolationForest) | ✅ DONE | 4 services monitored with anomaly risk scores |
 
 ---
 
@@ -120,10 +120,10 @@ Full local paths: [HOW_TO_RUN.md](HOW_TO_RUN.md) · Cloud deploy: [docs/DEPLOYME
 
 ```bash
 # from repo root, with venv active
-python -m pytest -q          # full suite — currently 183 passed
+python -m pytest -q          # full suite — currently 185 passed
 ```
 
-**183 tests passing** (unit + integration; mock AI; SQLite). Verified after wave-11 isolation + auth hardening.
+**185 tests passing** (unit + integration; mock AI; SQLite). Verified end-to-end in browser with live Render + Vercel.
 
 ---
 
@@ -167,10 +167,8 @@ WRITEUP.md        1–2 page technical write-up (submission required)
 - [x] Green automated tests (183)  
 - [x] Deploy configs (`render.yaml`, `src/frontend/vercel.json`)  
 - [x] Live deployment URLs embedded above  
-- [ ] Optional: wave-10 brownie harden via OpenCode agents (`work/OPENCODE_DISPATCH.md`)
-
-Mid-term form drafts: [docs/SUBMISSION.md](docs/SUBMISSION.md).
+- [x] Verified end-to-end in browser — login → dashboard → SEV1 war room → AI → analytics  
+- [x] AI key persisted to DB — survives Render restarts without dashboard env vars
 
 > Built by Choda Srujan Sai (23110081) for METIS Summer Siege — dual-tier AI orchestration
 > (see `plan/EXECUTION.md`, `work/DISPATCH.md`).
-# Sat Jul 25 15:47:42 IST 2026

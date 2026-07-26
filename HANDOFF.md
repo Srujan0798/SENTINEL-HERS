@@ -1,74 +1,50 @@
-# HANDOFF — SENTINEL-HERS
-**schema_version:** 2.2 · **Updated:** 2026-07-26  
-**Score:** ~89–92% · **Phase:** E9 (Freeze)  
-**Build:** clean · **Live:** all 13 checks pass · **CI:** green  
+# HANDOFF — SENTINEL (submission-ready)
 
-## Narrative — Session 2026-07-26 (Round 3: Final 100% Push)
+**Updated:** 2026-07-26  
+**Phase:** FREEZE  
+**Live frontend:** https://sentinel-hers.vercel.app  
+**Live backend:** https://sentinel-api-clu9.onrender.com  
+**Demo credentials:** `demo@sentinel.io` / `Sentinel2026!`
 
-Closed every remaining gap to push SENTINEL-HERS to **~98-100%**:
+## What works (verified in browser)
 
-**pgvector RAG:** Created `LogEmbedding` model with 768-dim vector column, NVIDIA embedding API integration for generating embeddings on demand, vector similarity search with cosine distance, keyword fallback when embeddings unavailable, background embed loop (30min), HNSW index for fast ANN search.
+- **Login** — renders with "▶ Enter live SEV1 demo" button, auto-fills credentials
+- **Dashboard** — 3 incidents (SEV1 investigating, SEV2 triaging, SEV3 resolved), MTTR 47m, SLA breached
+- **Incident war room** — AI summary (real OpenRouter LLM), timeline (4 events), tasks (4 with priorities), live chat
+- **Root cause analysis** — 5 hypotheses with confidence scores, evidence, suggested actions
+- **Analytics** — severity breakdown, top error services, predictive anomaly risk (IsolationForest)
+- **Monitoring + Deployments** — pages render with seeded data
+- **Settings** — dark mode toggle, team management, theme persistence
 
-**GitLab complete:** Added Merge Request (open/merge/close actions) and Pipeline event handlers to the GitLab webhook, filling the F5 gap. Now handles push, deployment, MR, and pipeline hooks.
+## Infrastructure
 
-**Refresh token cleanup:** Background task (6h interval) that purges expired `RevokedToken` rows via the FastAPI `lifespan` context manager.
+| Service | URL | Status |
+|---------|-----|--------|
+| Vercel frontend | https://sentinel-hers.vercel.app | ✅ Serves login, JS hydrates |
+| Render API | https://sentinel-api-clu9.onrender.com | ✅ Health 200, CORS OK |
+| Render PostgreSQL | managed | ✅ Seeded with 3 incidents |
+| Render Redis | managed | ✅ Connected |
+| AI | OpenRouter (Claude) | ✅ Real summaries + RCA |
+| CI | GitHub Actions `.github/workflows/ci.yml` | ✅ pytest + next lint |
 
-**Realtime hub bugfixes:** Fixed 3 bugs — (1) `subscribe()` used `**{f"team:{id}": cb}` which is invalid Python (colon in keyword arg), (2) one-team-only subscription guard `not self._listener_task` prevented multi-team Redis channels, (3) `publish()` didn't fan-out to local connections when Redis was active.
+## Key fixes this session
 
-**Infrastructure:** Docker postgres image upgraded to `pgvector/pgvector:pg16`, `pgvector>=0.3.0` added to requirements, auto-create vector extension on startup, HNSW index creation.
+| Fix | File |
+|-----|------|
+| Removed `output: "standalone"` — was breaking all Vercel routes | `src/frontend/next.config.ts` |
+| Tasks endpoint bare list → `{data: [...]}` | `src/backend/tasks/routes.py` |
+| AI key persisted to DB — survives restarts | `src/backend/ai/settings.py` + `shared_models.py` + `api/startup.py` |
+| Test updated for new response format | `tests/integration/test_sla.py` |
+| GitHub Actions CI | `.github/workflows/ci.yml` |
+| WRITEUP.md + README updated | Both with live URLs, verified stats |
 
-**Tests:** 13/13 VCS integration tests passing (added GitLab MR, Pipeline, Deployment tests). Auth fixture changed to `scope="class"` to avoid rate-limit exhaustion.
+## Tests
 
-## What's Complete
-| Area | Status | Key Deliverables |
-|------|--------|-----------------|
-| AI Integration | 100% | NVIDIA primary, pgvector RAG, streaming, citations |
-| Security | 100% | Fernet encryption, refresh rotation, SSE auth, token cleanup |
-| VCS Integration | 100% | GitHub + GitLab webhooks (push/MR/pipeline/deploy) |
-| Realtime | 100% | Redis pub/sub, fixed multi-worker bugs, SSE + WS |
-| UI/UX | ~95% | All pages skeleton/empty/mobile, dark mode, a11y |
-| Testing | 100% | 13 VCS tests, auth tests, pytest |
-| Score | **~98-100%** | All 10 FRs GREEN |
+185 passed (baseline, pre-existing errors unchanged by session's work).
 
-## What Was Built This Session
+## Submission
 
-### Infrastructure
-- `components/ui/skeleton.tsx` — reusable Skeleton component
-- `components/ui/toast.tsx` — Toaster component + `toast()` function
-- `app/not-found.tsx` — 404 page with back-to-dashboard link
-- `app/(dashboard)/error.tsx` — 500 page with retry + back buttons
-- Safe area CSS for iOS notch
-
-### Page Upgrades
-| Page | Improvements |
-|------|-------------|
-| **Dashboard** | Skeleton loading, SEV1 ring+icon+alert-trigger, empty state with action CTA, mobile grid |
-| **Incidents (War Room)** | SEV2=warning (yellow), Skeleton loading, grid 1:2 ratio, fade-in animation |
-| **Deployments** | SHA copy-to-clipboard with toast, GitLab badge+icon, failed red highlight, mobile card view, skeleton loading |
-| **Settings** | Dark mode toggle (localStorage), team management card, API keys (masked), notification toggles, skeleton loading |
-| **Monitoring** | Skeleton loading, empty states per section (AlertTriangle/Activity/Container icons), SEV2=warning badge, 44px touch targets |
-| **Analytics** | Skeleton loading, accurate MTTR (hours+minutes), per-panel error+retry, consistent Badge usage |
-
-### Bug Fixes
-- VoiceRecorder.tsx: removed duplicate authHeaders/resolvedBase/uploadAudio definitions, wrapped uploadAudio in useCallback, added deps
-- Login page: removed unused Check import and label param
-- Dashboard layout: 401 redirect moved to useEffect (was inline during render)
-- CommsPanel.tsx: reordered sendMessage before handleKeyDown to fix block-scope error, added missing dep
-- VoiceRecorder uploadAudio: added teamId/onIncidentCreated/resolvedBase to dependency array
-
-### Architecture / Docs
-- `claude/skills/eternity-core-methods/SKILL.md` — 24 techniques captured
-- `docs/SCOREBOARD.md` — updated with all UI work, honest ~89–92%
-
-## Deploy Status
-- **Frontend:** https://sentinel-hers.vercel.app (correct project aliased, all UI upgrades live)
-- **Backend:** https://sentinel-api-clu9.onrender.com (unchanged from prior session)
-- **verify_live.sh:** all 13 checks PASS
-- **FE build:** clean (tsc + ESLint + next build)
-- **Fix:** Deploy was going to wrong `frontend` project — relinked to correct `sentinel-hers` project. Now deploys to `sentinel-hers.vercel.app`.
-
-## Next Moves (for future sessions)
-1. Tag release `v1.0-metis-hard` if all gates green
-2. Record 2-min Loom walkthrough (optional but high impact)
-3. True RAG embeddings (optional stretch)
-4. Redis multi-worker verification
+**GitHub:** https://github.com/Srujan0798/SENTINEL-HERS  
+**Frontend:** https://sentinel-hers.vercel.app  
+**Write-up:** WRITEUP.md  
+**Demo path:** Login → dashboard → SEV1 war room → AI summary → root causes → timeline → tasks → analytics
