@@ -1,3 +1,4 @@
+import os
 import uuid
 from datetime import datetime, timedelta, timezone
 from typing import Optional
@@ -16,21 +17,19 @@ from .models import (
     UserResponse,
 )
 from src.backend.shared_models import RoleModel, TeamModel, UserModel, RevokedToken
-from src.backend.shared.secret_manager import get_jwt_secret, get_jwt_refresh_secret
-from src.backend.shared.services import AuthService, UserService
-from src.backend.shared.repositories import UnitOfWork
 
-JWT_SECRET: str = get_jwt_secret()
-JWT_REFRESH_SECRET: str = get_jwt_refresh_secret()
-
-# Global service instances
-def get_auth_service(db: Session) -> AuthService:
-    """Get auth service instance."""
-    return AuthService(db)
-
-def get_user_service(db: Session) -> UserService:
-    """Get user service instance."""
-    return UserService(db)
+_jwt = os.getenv("JWT_SECRET")
+_jwt_refresh = os.getenv("JWT_REFRESH_SECRET")
+_is_prod = os.getenv("ENV", "development").lower() in ("production", "prod")
+if not _jwt or not _jwt_refresh:
+    if _is_prod:
+        raise RuntimeError(
+            "JWT_SECRET and JWT_REFRESH_SECRET must be set in production."
+        )
+    _jwt = "dev-jwt-secret-do-not-use-in-prod"
+    _jwt_refresh = "dev-jwt-refresh-secret-do-not-use-in-prod"
+JWT_SECRET: str = _jwt
+JWT_REFRESH_SECRET: str = _jwt_refresh
 ACCESS_TOKEN_EXPIRE_MINUTES = 15
 REFRESH_TOKEN_EXPIRE_DAYS = 30
 

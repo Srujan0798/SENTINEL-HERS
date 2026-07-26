@@ -20,7 +20,6 @@ from .service import (
     register,
     hash_password,
 )
-from src.backend.shared.services import get_auth_service, get_user_service
 
 logger = logging.getLogger(__name__)
 
@@ -38,22 +37,19 @@ async def get_current_user_dependency(
 @router.post("/register", response_model=TokenResponse, status_code=status.HTTP_201_CREATED)
 @limiter.limit("60/minute")
 async def register_user(request: Request, body: RegisterRequest, db: Session = Depends(get_db)) -> TokenResponse:
-    auth_service = get_auth_service(db)
-    return auth_service.register_user(body)
+    return register(body, db)
 
 
 @router.post("/login", response_model=TokenResponse)
 @limiter.limit("10/minute")
 async def login_user(request: Request, body: LoginRequest, db: Session = Depends(get_db)) -> TokenResponse:
-    auth_service = get_auth_service(db)
-    return auth_service.login_user(body)
+    return login(body, db)
 
 
 @router.post("/refresh", response_model=TokenResponse)
 @limiter.limit("20/minute")
 async def refresh_access_token(request: Request, body: RefreshRequest, db: Session = Depends(get_db)) -> TokenResponse:
-    auth_service = get_auth_service(db)
-    return auth_service.refresh_token(body)
+    return refresh_token(body, db)
 
 
 @router.get("/me", response_model=UserResponse)

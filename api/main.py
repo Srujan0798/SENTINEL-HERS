@@ -6,10 +6,6 @@ from datetime import datetime, timezone
 from fastapi import FastAPI, Request, status
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
-from fastapi.middleware.httpsredirect import HTTPSRedirectMiddleware
-from starlette.middleware.gzip import GZipMiddleware
-from starlette.middleware.trustedhost import TrustedHostMiddleware
-from src.backend.shared.security_middleware import SecurityHeadersMiddleware, RateLimitMiddleware
 from slowapi import _rate_limit_exceeded_handler
 from slowapi.errors import RateLimitExceeded
 from slowapi.middleware import SlowAPIMiddleware
@@ -141,47 +137,16 @@ if not cors_origins:
     cors_origins = list(_DEFAULT_CORS_ORIGINS)
 logger.info("CORS allow-list: %s", cors_origins)
 
-# Security middleware
-if os.getenv("ENV", "development").lower() == "production":
-    # Redirect to HTTPS in production
-    app.add_middleware(HTTPSRedirectMiddleware)
-
-# Security middleware
-app.add_middleware(TrustedHostMiddleware, allowed_hosts=["*"])
-
-# Rate limiting middleware
-app.add_middleware(RateLimitMiddleware, max_requests=100, window_seconds=60)
-
-# Security headers middleware
-app.add_middleware(SecurityHeadersMiddleware)
-
-# Gzip compression
-app.add_middleware(GZipMiddleware, minimum_size=1000)
-
-# CORS middleware with explicit origins
 app.add_middleware(
     CORSMiddleware,
     allow_origins=cors_origins,
     allow_credentials=True,
-    allow_methods=["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
-    allow_headers=[
-        "Content-Type",
-        "Authorization",
-        "X-Requested-With",
-        "Accept",
-        "Origin",
-        "Access-Control-Request-Method",
-        "Access-Control-Request-Headers",
-    ],
-    expose_headers=["Content-Range", "X-Content-Range"],
-    max_age=600,
+    allow_methods=["*"],
+    allow_headers=["*"],
 )
 
 from src.backend.metrics import metrics_middleware, metrics_endpoint
-from src.backend.shared.error_handling import setup_error_handling
-
 app.middleware("http")(metrics_middleware)
-setup_error_handling(app)
 
 
 @app.get("/healthz")
