@@ -123,7 +123,7 @@ export default function SettingsPage() {
   const [channels, setChannels] = useState<{ channel: string; configured: boolean; hint: string }[]>([]);
 
   // AI provider settings (bring-your-own-key)
-  const [aiProvider, setAiProvider] = useState("mock");
+  const [aiProvider, setAiProvider] = useState("auto");
   const [aiKeyInput, setAiKeyInput] = useState("");
   const [aiKeysSet, setAiKeysSet] = useState<Record<string, boolean>>({});
   const [aiSaving, setAiSaving] = useState(false);
@@ -208,6 +208,8 @@ export default function SettingsPage() {
   }
 
   const AI_PROVIDER_FIELD: Record<string, string> = {
+    mistral: "mistral_key",
+    zhipu: "zhipu_key",
     claude: "anthropic_key",
     gemini: "gemini_key",
     openrouter: "openrouter_key",
@@ -507,6 +509,9 @@ export default function SettingsPage() {
             Want to test with your own AI key? Pick a provider, paste your key, and save —
             it takes effect immediately for AI summaries, root-cause analysis, chat, and
             postmortems. Admin role required. Keys are encrypted at rest and never shown again.
+            <strong> Auto (recommended)</strong> tries every configured key in priority order
+            (Mistral → Zhipu → OpenRouter → NVIDIA → Claude → Gemini) and falls through
+            automatically if one is rate-limited or misconfigured.
           </p>
           <div className="flex items-center gap-2">
             <span className="text-xs text-muted-foreground w-20 shrink-0">Provider</span>
@@ -515,17 +520,20 @@ export default function SettingsPage() {
               value={aiProvider}
               onChange={(e) => setAiProvider(e.target.value)}
             >
-              <option value="mock">Mock (no key needed)</option>
+              <option value="auto">Auto (priority chain)</option>
+              <option value="mistral">Mistral</option>
+              <option value="zhipu">Zhipu (Z.ai GLM)</option>
+              <option value="openrouter">OpenRouter (free models)</option>
+              <option value="nvidia">NVIDIA NIM</option>
               <option value="claude">Claude (Anthropic)</option>
               <option value="gemini">Gemini (Google)</option>
-              <option value="openrouter">OpenRouter</option>
-              <option value="nvidia">NVIDIA NIM</option>
+              <option value="mock">Mock (no key needed)</option>
             </select>
-            {aiProvider !== "mock" && aiKeysSet[aiProvider] && (
+            {aiProvider !== "mock" && aiProvider !== "auto" && aiKeysSet[aiProvider] && (
               <Badge variant="secondary" className="text-[10px]">key on file</Badge>
             )}
           </div>
-          {aiProvider !== "mock" && (
+          {aiProvider !== "mock" && aiProvider !== "auto" && (
             <div className="flex items-center gap-2">
               <span className="text-xs text-muted-foreground w-20 shrink-0">API key</span>
               <input
