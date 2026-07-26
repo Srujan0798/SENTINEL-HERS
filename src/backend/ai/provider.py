@@ -185,6 +185,23 @@ class NvidiaProvider(AIProvider):
         )
         self._model = os.getenv("AI_MODEL") or "meta/llama-3.1-405b-instruct"
 
+    def complete(self, messages: list[dict[str, str]], system: str = "") -> str:
+        openai_messages = []
+        if system:
+            openai_messages.append({"role": "system", "content": system})
+        for m in messages:
+            role = "assistant" if m["role"] == "assistant" else m["role"]
+            openai_messages.append({"role": role, "content": m["content"]})
+        try:
+            response = self._client.chat.completions.create(
+                model=self._model,
+                messages=openai_messages,
+                max_tokens=2048,
+            )
+            return response.choices[0].message.content or ""
+        except Exception as exc:
+            raise AIProviderError(f"NVIDIA call failed: {exc}") from exc
+
     def stream_complete(self, messages: list[dict[str, str]], system: str = ""):
         openai_messages = []
         if system:

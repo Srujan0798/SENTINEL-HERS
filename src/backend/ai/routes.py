@@ -167,6 +167,7 @@ async def get_incident_summary(
 
         summary = generate_incident_summary(incident_dict, logs, alerts)
     except Exception:
+        logger.exception("AI summary generation failed for incident %s", incident_id)
         raise HTTPException(
             status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
             detail={"error": "ai_unavailable", "fallback": None},
@@ -220,6 +221,7 @@ async def get_incident_root_causes(
 
         suggestions = suggest_root_causes(incident_dict, logs, deployments)
     except Exception:
+        logger.exception("AI root-cause analysis failed for incident %s", incident_id)
         raise HTTPException(
             status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
             detail={"error": "ai_unavailable", "fallback": None},
