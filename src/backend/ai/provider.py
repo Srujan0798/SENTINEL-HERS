@@ -393,6 +393,81 @@ _CHAIN_ORDER = [
 ]
 
 
+class ResilientChainProvider(AIProvider):
+    """Enhanced chain provider with better error handling and fallback logic."""
+    
+    def __init__(self, providers: list[tuple[str, AIProvider]]):
+        self._providers = providers
+        self._last_working_provider = None
+        self._failure_counts = {name: 0 for name, _ in providers}
+    
+    def complete(self, messages: list[dict[str, str]], system: str = "") -> str:
+        # Try the last working provider first for faster response
+        if self._last_working_provider:
+            try:
+                name, provider = self._last_working_provider
+                result = provider.complete(messages, system=system)
+                self._failure_counts[name] = 0  # Reset failure count on success
+                return result
+            except Exception as exc:
+                logger.warning("Last working provider %s failed: %s", name, exc)
+                self._failure_counts[name] += 1
+        
+        # Try all providers in order
+        last_err = None
+        for name, provider in self._providers:
+            # Skip providers that have failed multiple times
+            if self._failure_counts.get(name, 0) >= 3:
+                logger.warning("Skipping provider %s due to multiple failures", name)
+                continue
+                
+            try:
+                result = provider.complete(messages, system=system)
+                self._last_working_provider = (name, provider)
+                self._failure_counts[name] = 0  # Reset failure count on success
+                return result
+            except Exception as exc:
+                logger.warning("AI provider %s failed, trying next: %s", name, exc)
+                self._failure_counts[name] += 1
+                last_err = exc
+        
+        # If we get here, all providers failed
+        raise AIProviderError(f"All AI providers in the chain failed: {last_err}")
+    
+    def stream_complete(self, messages: list[dict[str, str]], system: str = ""):
+        # Similar logic for streaming
+        if self._last_working_provider:
+            try:
+                name, provider = self._last_working_provider
+                for chunk in provider.stream_complete(messages, system=system):
+                    yield chunk
+                return
+            except Exception as exc:
+                logger.warning("Last working provider %s stream failed: %s", name, exc)
+                self._failure_counts[name] += 1
+        
+        last_err = None
+        for name, provider in self._providers:
+            if self._failure_counts.get(name, 0) >= 3:
+                continue
+                
+            try:
+                yielded_any = False
+                for chunk in provider.stream_complete(messages, system=system):
+                    yielded_any = True
+                    yield chunk
+                if yielded_any:
+                    self._last_working_provider = (name, provider)
+                    self._failure_counts[name] = 0
+                    return
+            except Exception as exc:
+                logger.warning("AI provider %s stream failed, trying next: %s", name, exc)
+                self._failure_counts[name] += 1
+                last_err = exc
+        
+        raise AIProviderError(f"All AI providers in the chain failed: {last_err}")
+
+
 def _build_chain() -> AIProvider:
     providers: list[tuple[str, AIProvider]] = []
     for name, key_env, cls in _CHAIN_ORDER:
@@ -407,7 +482,7 @@ def _build_chain() -> AIProvider:
     if len(providers) == 1:
         return providers[0][1]
     logger.info("AI provider chain active: %s", " -> ".join(n for n, _ in providers))
-    return ChainProvider(providers)
+    return ResilientChainProvider(providers)
 
 
 def get_provider() -> AIProvider:

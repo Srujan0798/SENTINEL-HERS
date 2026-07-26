@@ -60,13 +60,27 @@ def create_test_tables():
     # FM-02: a stale DB/journal left behind by a previous crashed/interrupted
     # test session can corrupt or pollute state for this run (e.g. leftover
     # rows, half-written journal). Always start from a clean slate.
-    Path(db_path).unlink(missing_ok=True)
-    Path(f"{db_path}-journal").unlink(missing_ok=True)
+    try:
+        Path(db_path).unlink(missing_ok=True)
+        Path(f"{db_path}-journal").unlink(missing_ok=True)
+    except Exception as e:
+        print(f"Warning: Could not clean up old database files: {e}")
+    
+    # Ensure the database file is writable
+    try:
+        Path(db_path).touch(mode=0o644)
+    except Exception as e:
+        print(f"Warning: Could not set database file permissions: {e}")
+    
     engine = create_engine(
         f"sqlite:///./{db_path}",
-        connect_args={"check_same_thread": False},
+        connect_args={"check_same_thread": False, "timeout": 30},
     )
     Base.metadata.create_all(bind=engine)
     yield engine
     Base.metadata.drop_all(bind=engine)
-    Path(db_path).unlink(missing_ok=True)
+    try:
+        Path(db_path).unlink(missing_ok=True)
+        Path(f"{db_path}-journal").unlink(missing_ok=True)
+    except Exception as e:
+        print(f"Warning: Could not clean up database files after tests: {e}")
