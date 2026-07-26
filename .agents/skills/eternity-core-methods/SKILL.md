@@ -533,6 +533,336 @@ If build fails but tsc passes → it's ESLint. Fix the ESLint error, rarely is i
 
 ---
 
+
+## 25. The "Final 100% Push" Sequence
+
+When a project is at ~90-95% and you need to reach 100%, use this specific sequence:
+
+### Step 1: Comprehensive Gap Analysis
+Launch a task agent to find EVERY remaining gap across all 10 FRs, 14 FMs, integration points, infra configs, and tests. Ask it to return a table with Gap | Severity | File(s) | Line(s).
+
+### Step 2: Severity-Prioritize
+- **Critical:** Realtime hub bugs, security holes, data loss paths → Fix NOW
+- **High:** Missing FR features, broken tests, incorrect env config → Fix same session
+- **Medium:** Missing event handlers, missing cleanup crons, test infra → Fix same session
+- **Low:** Docstrings, dead code, empty `__init__.py` → Skip or batch
+
+### Step 3: Fix in Parallel Batches
+```
+Batch 1 (independent): Realtime hub + GitLab handlers + Token cleanup + Docker
+Batch 2: pgvector + tests
+Batch 3: Docs (SCOREBOARD + README + WRITEUP + HANDOFF)
+```
+
+### Step 4: The 100% Checklist
+- [ ] All integration tests pass together (not just in isolation)
+- [ ] verify_live.sh passes (or equivalent live probe)
+- [ ] SCOREBOARD says ~100% with honest evidence rows
+- [ ] README reflects current providers/features/counts
+- [ ] WRITEUP has current verification snapshot
+- [ ] HANDOFF says "Nothing remains — stretch only"
+- [ ] v1.0 tag created (optional but recommended)
+
+
+## 26. Gap Analysis Agent Pattern
+
+When you need a comprehensive codebase audit, launch a dedicated `explore` agent with this prompt:
+
+```
+Explore the codebase at <path> to find EVERY gap between current state and 100% completeness.
+
+1. Feature completeness — is every FR fully implemented?
+2. Bug inventory — read critical files for logic errors
+3. Missing infrastructure — cleanup crons, background tasks, DB extensions
+4. Dead code — unused routers, empty directories, unregistered endpoints
+5. Test gaps — missing test coverage for new features
+6. Config gaps — missing env vars, Docker images, CI steps
+7. Doc gaps — stale README/WRITEUP/SCOREBOARD entries
+
+Return a comprehensive table with: Gap | Severity | File(s) | Line(s)
+```
+
+**Law:** The gap analysis agent returns the *truth*, not what you want to hear. Run it before claiming completion.
+
+
+## 27. Test Infrastructure Debugging Flow
+
+When `pytest` errors at setup (not in your test body):
+
+1. Check error location — is it in a fixture (setup) or test body?
+2. If fixture → check rate limiting (register/login limits 5/min)
+3. Check shared app state (dependency_overrides bleeding between modules)
+4. Check DB isolation (SQLite files vs in-memory conflicts)
+5. Fix strategies: raise rate limit OR class-scoped fixtures OR override limiter in test
+
+**Key insight:** When tests pass individually but fail in a full run, it's almost always:
+- Rate limiting (too many registrations in 1 minute)
+- Shared mutable state (dependency_overrides, global limiter)
+
+
+## 28. Class-Scoped Auth Fixture Pattern
+
+```python
+@pytest.fixture(scope="class")
+def team_a():
+    resp = client.post("/auth/register", json={
+        "email": f"test{_ctr[0]}@example.com",
+        "password": "testpass123",
+        "name": "Tester",
+        "team_name": "Test Team",
+    })
+    assert resp.status_code == 201, f"Register failed: {resp.text}"
+    data = resp.json()
+    return {"headers": {"Authorization": f"Bearer {data['access_token']}"}, "team_id": data["user"]["team_id"]}
+```
+
+**Why:** A `scope="function"` fixture creates a new user for every test. With 13+ tests and a 5/min rate limit, tests 6+ fail. With `scope="class"`, one registration serves all tests in the class.
+
+**Combine with:** Raising register rate limit from 5→60/min for CI environments.
+
+
+## 29. pgvector Integration Pattern
+
+### Infrastructure
+```yaml
+# docker-compose.yml
+postgres:
+  image: pgvector/pgvector:pg16
+```
+```text
+# requirements.txt
+pgvector>=0.3.0
+```
+
+### Extension (idempotent)
+```python
+with engine.connect() as conn:
+    conn.execute(text("CREATE EXTENSION IF NOT EXISTS vector"))
+```
+
+### Model
+```python
+from pgvector.sqlalchemy import Vector
+
+class LogEmbedding(Base):
+    __tablename__ = "log_embeddings"
+    log_id = Column(_UuidStr, ForeignKey("logs.id"), primary_key=True)
+    embedding = Column(Vector(768))
+```
+
+### Service
+```python
+def generate_embedding(text: str) -> list[float] | None:
+    with httpx.Client(timeout=30) as client:
+        resp = client.post("https://api.nvidia.com/v1/embeddings",
+            headers={"Authorization": f"Bearer {key}"},
+            json={"model": "nvidia/nv-embed-v1", "input": text[:8000]})
+        return resp.json()["data"][0]["embedding"]
+
+def search_similar(query, team_id, db_session, top_k=20):
+    embedding = generate_embedding(query)
+    sql = text("""
+        SELECT log_id, (embedding <=> :emb::vector) AS distance
+        FROM log_embeddings WHERE team_id = :team_id
+        ORDER BY distance ASC LIMIT :top_k
+    """)
+    # distance → similarity = max(0, 1 - distance)
+```
+
+### Index
+```sql
+CREATE INDEX IF NOT EXISTS idx_embeddings_vector
+ON log_embeddings USING hnsw (embedding vector_cosine_ops);
+```
+
+### Fallback Chain
+```python
+# Priority: vector search → keyword search → empty
+vector_results = search_similar(query, team_id, db)
+if vector_results:
+    return vector_results
+return keyword_search(query, team_id, db)
+```
+
+
+## 30. Lifespan Background Tasks Pattern
+
+Never use module-level `asyncio.create_task()` — it fails when the app is imported without a running loop.
+
+**Correct:**
+```python
+from contextlib import asynccontextmanager
+
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    tasks = [asyncio.create_task(_cleanup_expired_tokens())]
+    yield
+    for t in tasks:
+        t.cancel()
+    await asyncio.gather(*tasks, return_exceptions=True)
+
+app = FastAPI(lifespan=lifespan)
+```
+
+**Rule:** If a background task touches the database, wrap each iteration in try/except with its own session.
+
+
+## 31. Realtime Hub Multi-Worker Pattern
+
+### Bug 1: Invalid subscribe keyword argument
+```python
+# WRONG — colon in keyword arg name
+await pubsub.subscribe(**{f"team:{team_id}": handler})
+
+# RIGHT — positional channel name
+await pubsub.subscribe(f"team:{team_id}")
+```
+
+### Bug 2: One-team subscription gate
+```python
+# WRONG — only first team subscribed
+if not self._listener_task:
+    await pubsub.subscribe(channel)
+
+# RIGHT — subscribe per team, listener once
+await pubsub.subscribe(channel)
+if not self._listener_task:
+    self._listener_task = create_task(listener())
+```
+
+### Bug 3: No local fan-out with Redis
+```python
+# WRONG — local clients miss events
+if self._redis:
+    await redis.publish(channel, msg)
+    return
+
+# RIGHT — always fan-out locally too
+if self._redis:
+    await redis.publish(channel, msg)
+for conn in local_connections:
+    conn.queue.put_nowait(event)
+```
+
+
+## 32. The "As-Built Documentation Sync" Rule
+
+Whenever you change code in a close-out phase, update ALL of these simultaneously in one commit:
+
+```
+SCOREBOARD.md  — per-criterion evidence rows
+READ ME.md      — badge count, tech stack, env vars
+WRITEUP.md      — verification snapshot, architecture
+HANDOFF.md      — narrative, what was built, score
+```
+
+**Pattern:** `git add <code> <docs> && git commit -m "feat + docs: ..."`
+
+
+## 33. Security Hardening Sequence
+
+```
+1. Encryption at rest (Fernet) — protect stored secrets
+2. Token rotation (jti + blacklist) — invalidate stolen tokens
+3. Auth header for SSE — move token out of URL (EventSource → fetch)
+```
+
+
+## 34. Test Count Honesty Rule
+
+```bash
+# Count total tests
+python -m pytest tests/ -q --tb=no 2>&1 | tail -1
+
+# Run ALL tests together (catches isolation bugs)
+python -m pytest tests/ -q --tb=line 2>&1 | tail -3
+```
+
+**Law:** The badge in README must match `pytest -q --tb=no`. Manual count is forbidden (FM-09).
+
+
+## 35. FR Completion Definition
+
+An FR is COMPLETE only when:
+
+```
+✅ Code exists (backend + frontend)
+✅ Integration test covers happy + sad paths
+✅ verify_live.sh checks it (or equivalent live probe)
+✅ SCOREBOARD row says ~100% with specific evidence
+✅ User can demonstrate it in < 2 clicks
+```
+
+
+## 36. Project Finalization Checklist (100% Sign-off)
+
+### Functional
+- [ ] All FRs demonstrable live
+- [ ] No mock data when real provider configured
+- [ ] Error states handled gracefully
+- [ ] Empty states have CTAs
+
+### Security
+- [ ] Auth on every route (401/403 correct)
+- [ ] Tenant isolation proven
+- [ ] No secrets in source code or URL params
+- [ ] Rate limiting on auth endpoints
+- [ ] Secrets encrypted at rest
+
+### Infrastructure
+- [ ] Docker compose works end-to-end
+- [ ] Live deployment (Render + Vercel)
+- [ ] CI passes (pytest + build + lint + typecheck)
+- [ ] verify_live.sh passes
+- [ ] Playwright e2e passes
+
+### Documentation
+- [ ] SCOREBOARD.md — honest per-criterion evidence
+- [ ] README.md — current badges, stack, env vars, demo creds
+- [ ] WRITEUP.md — challenges, decisions, verification snapshot
+- [ ] HANDOFF.md — narrative, what was built, remaining items
+
+
+## 37. Score Escalation Path
+
+The last 10% takes as much effort as the first 50%. Prioritize:
+
+| Score | Next lever | Expected gain |
+|---|---|---|
+| 95-99% | Gap analysis + parallel fixes | +4% |
+| 99-100% | Documentation + verification | +1% |
+
+At 95-99%, the biggest gains:
+1. Comprehensive gap analysis (find hidden bugs)
+2. Test infra fixes (all tests pass together)
+3. Documentation sync (honest evidence)
+4. Security review + fixes
+5. Realtime/background task reliability
+
+
+## 38. The "Session Close" Ritual
+
+End every close-out session with:
+
+```bash
+# 1. Run ALL tests
+python -m pytest tests/ -q --tb=line 2>&1 | tail -3
+
+# 2. Run verify script
+bash scripts/verify_live.sh 2>&1 | tail -5
+
+# 3. Update all docs in one commit
+git add SCOREBOARD.md README.md WRITEUP.md HANDOFF.md
+git commit -m "docs: session close — [summary]"
+
+# 4. Push
+git push origin main
+```
+
+**Evidence captured:** test output, verify output, commit hash, push confirmation (FM-09 closure evidence).
+
+---
+
 ## 25. Root Cause First Debugging (Don't Patch Symptoms)
 
 When multiple things break simultaneously (e.g., all routes return 404, all tests fail), resist the urge to fix each individually. Find the ONE root cause:
