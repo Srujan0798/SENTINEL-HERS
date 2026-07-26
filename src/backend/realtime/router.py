@@ -36,13 +36,19 @@ def _authenticate_token(token: str) -> dict:
 
 
 @router.get("/realtime/events")
-async def sse_events(token: str = Query(..., description="JWT access token")):
+async def sse_events(
+    token: str = Query("", description="JWT access token (fallback — prefer Authorization header)"),
+    authorization: str = "",
+):
     """SSE stream — pushes realtime events for the caller's team.
 
-    Returns:
-        StreamingResponse with text/event-stream content type.
+    Prefers Authorization: Bearer <token> header. Falls back to ?token= query param.
     """
-    user = _authenticate_token(token)
+    # Prefer Authorization header over query param to avoid token leakage in logs
+    auth_token = token
+    if authorization.startswith("Bearer "):
+        auth_token = authorization[7:]
+    user = _authenticate_token(auth_token)
     team_id = user["team_id"]
     hub = get_hub()
     await hub.initialize()

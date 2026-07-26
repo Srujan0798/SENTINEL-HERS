@@ -185,7 +185,7 @@ class NvidiaProvider(AIProvider):
         )
         self._model = os.getenv("AI_MODEL") or "meta/llama-3.1-405b-instruct"
 
-    def complete(self, messages: list[dict[str, str]], system: str = "") -> str:
+    def stream_complete(self, messages: list[dict[str, str]], system: str = ""):
         openai_messages = []
         if system:
             openai_messages.append({"role": "system", "content": system})
@@ -193,14 +193,18 @@ class NvidiaProvider(AIProvider):
             role = "assistant" if m["role"] == "assistant" else m["role"]
             openai_messages.append({"role": role, "content": m["content"]})
         try:
-            response = self._client.chat.completions.create(
+            stream = self._client.chat.completions.create(
                 model=self._model,
                 messages=openai_messages,
                 max_tokens=2048,
+                stream=True,
             )
-            return response.choices[0].message.content or ""
+            for chunk in stream:
+                delta = chunk.choices[0].delta.content
+                if delta:
+                    yield delta
         except Exception as exc:
-            raise AIProviderError(f"NVIDIA API call failed: {exc}") from exc
+            raise AIProviderError(f"NVIDIA stream failed: {exc}") from exc
 
 
 class MockProvider(AIProvider):

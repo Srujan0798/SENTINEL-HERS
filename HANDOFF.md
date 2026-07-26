@@ -38,10 +38,11 @@ Full UI domination push across all pages. Fixed VoiceRecorder ESLint build block
 - `docs/SCOREBOARD.md` — updated with all UI work, honest ~89–92%
 
 ## Deploy Status
-- **Frontend:** https://sentinel-hers.vercel.app (all UI upgrades live)
+- **Frontend:** https://sentinel-hers.vercel.app (correct project aliased, all UI upgrades live)
 - **Backend:** https://sentinel-api-clu9.onrender.com (unchanged from prior session)
 - **verify_live.sh:** all 13 checks PASS
 - **FE build:** clean (tsc + ESLint + next build)
+- **Fix:** Deploy was going to wrong `frontend` project — relinked to correct `sentinel-hers` project. Now deploys to `sentinel-hers.vercel.app`.
 
 ## Next Moves (for future sessions)
 1. Tag release `v1.0-metis-hard` if all gates green

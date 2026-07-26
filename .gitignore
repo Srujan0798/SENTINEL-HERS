@@ -40,3 +40,5 @@ Thumbs.db
 .env.credentials
 echo .playwright-cli
 .playwright-cli/
+.vercel
+.env*

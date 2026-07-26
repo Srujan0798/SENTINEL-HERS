@@ -16,7 +16,7 @@ from .models import (
     TokenResponse,
     UserResponse,
 )
-from src.backend.shared_models import RoleModel, TeamModel, UserModel
+from src.backend.shared_models import RoleModel, TeamModel, UserModel, RevokedToken
 
 _jwt = os.getenv("JWT_SECRET")
 _jwt_refresh = os.getenv("JWT_REFRESH_SECRET")
@@ -64,6 +64,7 @@ def create_refresh_token(user_id: str, team_id: str, role: str) -> str:
         "team_id": str(team_id),
         "role": role,
         "type": "refresh",
+        "jti": str(uuid.uuid4()),
         "iat": now,
         "exp": now + timedelta(days=REFRESH_TOKEN_EXPIRE_DAYS),
     }
@@ -247,6 +248,14 @@ def login(request: LoginRequest, db: Session) -> TokenResponse:
 
 def refresh_token(request: RefreshRequest, db: Session) -> TokenResponse:
     payload = decode_refresh_token(request.refresh_token)
+    old_jti = payload.get("jti")
+    if old_jti:
+        revoked = db.query(RevokedToken).filter(RevokedToken.jti == old_jti).first()
+        if revoked:
+            raise HTTPException(
+                status_code=status.HTTP_401_UNAUTHORIZED,
+                detail="Refresh token has been revoked",
+            )
     user = get_user(db, payload.get("sub"))
     if not user:
         raise HTTPException(
@@ -258,6 +267,12 @@ def refresh_token(request: RefreshRequest, db: Session) -> TokenResponse:
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Account is deactivated",
         )
+
+    if old_jti:
+        now_dt = datetime.now(timezone.utc)
+        exp = datetime.fromtimestamp(payload["exp"], tz=timezone.utc) if payload.get("exp") else now_dt
+        db.add(RevokedToken(jti=old_jti, user_id=str(user.id), revoked_at=now_dt, expires_at=exp))
+        db.commit()
 
     role_name = _role_name(db, user, default="admin")
     return TokenResponse(

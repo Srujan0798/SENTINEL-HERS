@@ -3,7 +3,6 @@
 import { useEffect, useRef, useCallback } from "react";
 import { getAccessToken } from "./auth";
 
-// Origin only (no path). Prefer NEXT_PUBLIC_API_BASE_URL; fall back to legacy names.
 const API_ORIGIN = (
   process.env.NEXT_PUBLIC_API_BASE_URL ||
   process.env.NEXT_PUBLIC_API_URL ||
@@ -33,9 +32,9 @@ export function useRealtimeStream(
 ) {
   const { enabled = true, onOpen, onError, onDisconnect } = options;
   const handlerRef = useRef(handler);
-  const eventSourceRef = useRef<EventSource | null>(null);
   const reconnectTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const retriesRef = useRef(0);
+  const abortRef = useRef<AbortController | null>(null);
   const maxRetries = 10;
 
   handlerRef.current = handler;
@@ -45,92 +44,91 @@ export function useRealtimeStream(
       clearTimeout(reconnectTimeoutRef.current);
       reconnectTimeoutRef.current = null;
     }
-    if (eventSourceRef.current) {
-      const es = eventSourceRef.current;
-      const named = (es as unknown as { __namedListeners?: Array<[string, (e: MessageEvent) => void]> })
-        .__namedListeners;
-      if (named) {
-        for (const [t, fn] of named) es.removeEventListener(t, fn as EventListener);
-      }
-      es.close();
-      eventSourceRef.current = null;
+    if (abortRef.current) {
+      abortRef.current.abort();
+      abortRef.current = null;
     }
+    retriesRef.current = 0;
   }, []);
 
   const connect = useCallback(() => {
     if (!enabled) return;
-
     const token = getAccessToken();
     if (!token) return;
 
     cleanup();
 
     const wsBase = process.env.NEXT_PUBLIC_WS_URL;
-    // Mounted at /api/realtime/events (not /api/v1/…)
-    const url = wsBase
-      ? `${wsBase.replace(/\/$/, "")}/api/realtime/events?token=${encodeURIComponent(token)}`
-      : `${API_ORIGIN}/api/realtime/events?token=${encodeURIComponent(token)}`;
-    const es = new EventSource(url);
-    eventSourceRef.current = es;
+    const baseUrl = wsBase
+      ? `${wsBase.replace(/\/$/, "")}/api/realtime/events`
+      : `${API_ORIGIN}/api/realtime/events`;
 
-    es.onopen = () => {
-      retriesRef.current = 0;
-      onOpen?.();
-    };
+    const controller = new AbortController();
+    abortRef.current = controller;
+    let closed = false;
 
-    es.onerror = (event) => {
-      onError?.(event);
-      es.close();
-
-      if (retriesRef.current < maxRetries) {
-        const delay = Math.min(1000 * Math.pow(2, retriesRef.current), 30000);
-        retriesRef.current += 1;
-        reconnectTimeoutRef.current = setTimeout(connect, delay);
-      } else {
-        onDisconnect?.();
-      }
-    };
-
-    // Backend uses named SSE events (`event: incident.create`). Named events do
-    // NOT fire `onmessage` — only default (unnamed) events do. Register known types.
-    const dispatch = (raw: MessageEvent, fallbackType?: string) => {
+    (async () => {
       try {
-        const data = JSON.parse(raw.data) as RealtimeEvent;
-        if (!data.event_type && fallbackType) data.event_type = fallbackType;
-        handlerRef.current(data);
+        const response = await fetch(baseUrl, {
+          headers: { Authorization: `Bearer ${token}` },
+          signal: controller.signal,
+        });
+        if (!response.ok || !response.body) {
+          throw new Error(`SSE connection failed: ${response.status}`);
+        }
+        retriesRef.current = 0;
+        onOpen?.();
+
+        const reader = response.body.getReader();
+        const decoder = new TextDecoder();
+        let buffer = "";
+
+        while (!closed) {
+          const { done, value } = await reader.read();
+          if (done) break;
+          buffer += decoder.decode(value, { stream: true });
+          const lines = buffer.split("\n");
+          buffer = lines.pop() || "";
+          let eventType = "";
+          let data = "";
+          for (const line of lines) {
+            if (line.startsWith("event: ")) {
+              eventType = line.slice(7).trim();
+            } else if (line.startsWith("data: ")) {
+              data = line.slice(6).trim();
+            } else if (line === "" && data) {
+              try {
+                const parsed = JSON.parse(data) as RealtimeEvent;
+                if (eventType) parsed.event_type = eventType;
+                handlerRef.current(parsed);
+              } catch { /* ignore malformed */ }
+              eventType = "";
+              data = "";
+            }
+          }
+        }
       } catch {
-        /* ignore malformed */
+        if (closed) return;
+        onError?.(new Event("sse-error"));
+        if (retriesRef.current < maxRetries) {
+          const delay = Math.min(1000 * Math.pow(2, retriesRef.current), 30000);
+          retriesRef.current += 1;
+          reconnectTimeoutRef.current = setTimeout(connect, delay);
+        } else {
+          onDisconnect?.();
+        }
       }
-    };
+    })();
 
-    const namedTypes = [
-      "connected",
-      "incident.create",
-      "incident.update",
-      "incident.assign",
-      "incident.escalate",
-      "task.create",
-      "task.update",
-      "channel.message",
-      "mention.created",
-      "alert.created",
-      "deployment.created",
-      "ping",
-    ];
-    const listeners: Array<[string, (e: MessageEvent) => void]> = namedTypes.map((t) => {
-      const fn = (e: MessageEvent) => dispatch(e, t);
-      es.addEventListener(t, fn as EventListener);
-      return [t, fn];
-    });
-    es.onmessage = (event) => dispatch(event);
-
-    // stash for cleanup
-    (es as unknown as { __namedListeners?: typeof listeners }).__namedListeners = listeners;
+    return () => { closed = true; controller.abort(); };
   }, [enabled, cleanup, onOpen, onError, onDisconnect]);
 
   useEffect(() => {
-    connect();
-    return cleanup;
+    const cancel = connect();
+    return () => {
+      cancel?.();
+      cleanup();
+    };
   }, [connect, cleanup]);
 }
 

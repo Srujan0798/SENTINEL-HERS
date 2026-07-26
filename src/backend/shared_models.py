@@ -5,6 +5,7 @@ building the SQLite test DB. Production uses the raw SQL migration in
 schema/migrations/001_initial_schema.sql.
 """
 import uuid
+import datetime
 from sqlalchemy import Column, String, Boolean, DateTime, ForeignKey, JSON
 from sqlalchemy.types import TypeDecorator
 
@@ -66,5 +67,13 @@ class UserModel(Base):
     last_login_at = Column(DateTime(timezone=True), nullable=True)
     created_at = Column(DateTime(timezone=True), nullable=True)
     updated_at = Column(DateTime(timezone=True), nullable=True)
+
+
+class RevokedToken(Base):
+    __tablename__ = "revoked_tokens"
+    jti = Column(String(64), primary_key=True)
+    user_id = Column(_UuidStr, ForeignKey("users.id", ondelete="CASCADE"), nullable=False)
+    revoked_at = Column(DateTime(timezone=True), nullable=False, default=datetime.datetime.utcnow)
+    expires_at = Column(DateTime(timezone=True), nullable=False)
 
 
