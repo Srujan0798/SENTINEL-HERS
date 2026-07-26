@@ -21,6 +21,7 @@ from src.backend.logs.models import (
     LogEntryModel,
     alert_from_orm,
 )
+from src.backend.shared.input_validator import InputValidator
 
 router = APIRouter(tags=["logs"])
 
@@ -55,12 +56,20 @@ async def search_logs(
     team_id = current_user["team_id"]
     query = db.query(LogEntryModel).filter(LogEntryModel.team_id == team_id)
 
+    # Validate and sanitize inputs
     if q:
-        query = query.filter(LogEntryModel.message.ilike(f"%{q}%"))
+        sanitized_q = InputValidator.sanitize_search_query(q)
+        if sanitized_q:
+            query = query.filter(LogEntryModel.message.ilike(f"%{sanitized_q}%"))
+    
     if service:
-        query = query.filter(LogEntryModel.service == service)
+        sanitized_service = InputValidator.validate_service_name(service)
+        query = query.filter(LogEntryModel.service == sanitized_service)
+    
     if level:
-        query = query.filter(LogEntryModel.level == level)
+        sanitized_level = InputValidator.validate_log_level(level)
+        query = query.filter(LogEntryModel.level == sanitized_level)
+    
     if from_ts is not None:
         query = query.filter(LogEntryModel.created_at >= from_ts)
     if to_ts is not None:

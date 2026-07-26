@@ -12,6 +12,9 @@ import logging
 import os
 from abc import ABC, abstractmethod
 from typing import Any
+import time
+
+from src.backend.shared.advanced_circuit_breaker import circuit_breaker, with_circuit_breaker
 
 logger = logging.getLogger(__name__)
 
@@ -62,7 +65,10 @@ class ClaudeProvider(AIProvider):
         )
         self._model = _claude_model()
 
+    @with_circuit_breaker("ai")
     def complete(self, messages: list[dict[str, str]], system: str = "") -> str:
+        start_time = time.time()
+        
         kwargs: dict[str, Any] = {
             "model": self._model,
             "max_tokens": 2048,
@@ -70,20 +76,30 @@ class ClaudeProvider(AIProvider):
         }
         if system:
             kwargs["system"] = system
+        
         try:
             response = self._client.messages.create(**kwargs)
+            response_time = time.time() - start_time
+            
+            # Log successful response time for monitoring
+            logger.info(f"Claude API call completed in {response_time:.2f}s")
+            
+            try:
+                return response.content[0].text
+            except (IndexError, AttributeError) as exc:
+                raise AIProviderError(
+                    f"Claude returned an unexpected response shape: {exc}"
+                ) from exc
+                
         except self._anthropic.APIError as exc:
             # Covers auth, rate-limit, timeout (APITimeoutError), overloaded, 5xx.
+            response_time = time.time() - start_time
+            logger.error(f"Claude API call failed in {response_time:.2f}s: {exc}")
             raise AIProviderError(f"Claude API call failed: {exc}") from exc
         except Exception as exc:  # transport / unexpected — still fail loud, not silent
+            response_time = time.time() - start_time
+            logger.error(f"Claude call failed unexpectedly in {response_time:.2f}s: {exc}")
             raise AIProviderError(f"Claude call failed unexpectedly: {exc}") from exc
-
-        try:
-            return response.content[0].text
-        except (IndexError, AttributeError) as exc:
-            raise AIProviderError(
-                f"Claude returned an unexpected response shape: {exc}"
-            ) from exc
 
 
 class GeminiProvider(AIProvider):
@@ -94,7 +110,10 @@ class GeminiProvider(AIProvider):
         genai.configure(api_key=os.environ["GEMINI_API_KEY"])
         self._model_name = _gemini_model()
 
+    @with_circuit_breaker("ai")
     def complete(self, messages: list[dict[str, str]], system: str = "") -> str:
+        start_time = time.time()
+        
         genai = self._genai
         system_inst = system if system else None
         model = genai.GenerativeModel(self._model_name, system_instruction=system_inst)
@@ -105,21 +124,28 @@ class GeminiProvider(AIProvider):
             }
             for m in messages
         ]
+        
         try:
             response = model.generate_content(
                 gemini_messages,
                 request_options={"timeout": _REQUEST_TIMEOUT},
             )
+            
+            response_time = time.time() - start_time
+            logger.info(f"Gemini API call completed in {response_time:.2f}s")
+            
+            try:
+                return response.text
+            except (ValueError, AttributeError) as exc:
+                # .text raises if the response was blocked / empty.
+                raise AIProviderError(
+                    f"Gemini returned no usable text: {exc}"
+                ) from exc
+                
         except Exception as exc:
+            response_time = time.time() - start_time
+            logger.error(f"Gemini API call failed in {response_time:.2f}s: {exc}")
             raise AIProviderError(f"Gemini API call failed: {exc}") from exc
-
-        try:
-            return response.text
-        except (ValueError, AttributeError) as exc:
-            # .text raises if the response was blocked / empty.
-            raise AIProviderError(
-                f"Gemini returned no usable text: {exc}"
-            ) from exc
 
 
 class OpenRouterProvider(AIProvider):
