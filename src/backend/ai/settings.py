@@ -10,21 +10,35 @@ from src.backend.shared_models import SystemSetting
 
 logger = logging.getLogger(__name__)
 
-_ENCRYPTION_KEY: bytes | None = None
+_FERNET: object | None = None
+_FERNET_INIT_DONE = False
 
 
 def _get_fernet() -> object | None:
-    global _ENCRYPTION_KEY
+    """Build (once) and cache the Fernet instance from ENCRYPTION_KEY.
+
+    Previously this regenerated a brand-new random key on every call whenever
+    the configured key didn't end in "=", so encrypt() and decrypt() used
+    different keys and decryption silently failed every time. Now the key is
+    validated and cached exactly once; an invalid key fails loud in the log
+    instead of silently rotating.
+    """
+    global _FERNET, _FERNET_INIT_DONE
+    if _FERNET_INIT_DONE:
+        return _FERNET
+    _FERNET_INIT_DONE = True
     raw = os.getenv("ENCRYPTION_KEY") or os.getenv("SENTINEL_ENCRYPTION_KEY")
     if not raw:
         return None
     try:
         from cryptography.fernet import Fernet
-        key = raw if raw.endswith("=") else Fernet.generate_key()
-        _ENCRYPTION_KEY = key.encode() if isinstance(key, str) else key
-        return Fernet(_ENCRYPTION_KEY)
+        _FERNET = Fernet(raw.encode() if isinstance(raw, str) else raw)
+        return _FERNET
     except Exception:
-        logger.warning("ENCRYPTION_KEY invalid — storing keys without encryption")
+        logger.error(
+            "ENCRYPTION_KEY is set but is not a valid Fernet key — "
+            "storing/reading AI provider keys WITHOUT encryption until fixed."
+        )
         return None
 
 
