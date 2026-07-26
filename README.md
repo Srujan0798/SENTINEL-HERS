@@ -13,7 +13,7 @@
 **Problem statement:** Sentinel — AI Native Engineering Operations Platform (Hard).  
 Brief: [ps.md](ps.md) · Architecture: [plan/ARCHITECTURE.md](plan/ARCHITECTURE.md) · Write-up: [WRITEUP.md](WRITEUP.md)
 
-![status](https://img.shields.io/badge/tests-182%20passing-brightgreen)
+![status](https://img.shields.io/badge/tests-198%20passing-brightgreen)
 ![backend](https://img.shields.io/badge/backend-FastAPI-009688)
 ![frontend](https://img.shields.io/badge/frontend-Next.js%2015-black)
 ![deploy](https://img.shields.io/badge/deploy-Render%20%2B%20Vercel-blue)
@@ -123,10 +123,10 @@ Full local paths: [HOW_TO_RUN.md](HOW_TO_RUN.md) · Cloud deploy: [docs/DEPLOYME
 
 ```bash
 # from repo root, with venv active
-python -m pytest -q          # full suite — currently 182+ passed (19 integration, 163+ unit)
+python -m pytest -q          # full suite — currently 198 passed
 ```
 
-**182+ tests passing** (unit + integration; mock AI; SQLite). Verified end-to-end with Playwright sacred-path spec against production URL (14-step judge walkthrough).
+**198 tests passing** (unit + integration; mock AI; SQLite). Verified end-to-end in browser with live Render + Vercel.
 
 ---
 
