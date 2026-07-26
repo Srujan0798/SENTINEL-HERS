@@ -65,6 +65,8 @@ _AI_KEYS = {
     "GEMINI_API_KEY": None,
     "OPENROUTER_API_KEY": None,
     "NVAPI_KEY": None,
+    "MISTRAL_API_KEY": None,
+    "ZHIPU_API_KEY": None,
 }
 
 
@@ -85,6 +87,8 @@ def save_ai_settings(
     gemini_key: str | None = None,
     openrouter_key: str | None = None,
     nvapi_key: str | None = None,
+    mistral_key: str | None = None,
+    zhipu_key: str | None = None,
 ) -> None:
     now = datetime.now(timezone.utc)
     pairs = {}
@@ -98,6 +102,10 @@ def save_ai_settings(
         pairs["OPENROUTER_API_KEY"] = openrouter_key
     if nvapi_key:
         pairs["NVAPI_KEY"] = nvapi_key
+    if mistral_key:
+        pairs["MISTRAL_API_KEY"] = mistral_key
+    if zhipu_key:
+        pairs["ZHIPU_API_KEY"] = zhipu_key
     for key, value in pairs.items():
         encrypted = _encrypt(value)
         row = db.query(SystemSetting).filter(SystemSetting.key == key).first()

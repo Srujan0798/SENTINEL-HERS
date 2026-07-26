@@ -22,11 +22,13 @@ router = APIRouter(prefix="/api/ai", tags=["ai"])
 
 
 class AISettingsRequest(BaseModel):
-    provider: str = "openrouter"
+    provider: str = "auto"
     anthropic_key: str = ""
     gemini_key: str = ""
     openrouter_key: str = ""
     nvapi_key: str = ""
+    mistral_key: str = ""
+    zhipu_key: str = ""
 
 
 @router.post("/settings")
@@ -44,6 +46,8 @@ async def set_ai_settings(
         gemini_key=body.gemini_key or None,
         openrouter_key=body.openrouter_key or None,
         nvapi_key=body.nvapi_key or None,
+        mistral_key=body.mistral_key or None,
+        zhipu_key=body.zhipu_key or None,
     )
     return {"status": "ok", "provider": body.provider}
 
@@ -55,11 +59,16 @@ async def get_ai_settings(
 ):
     from src.backend.shared_models import SystemSetting
 
-    keys = ["AI_PROVIDER", "ANTHROPIC_API_KEY", "GEMINI_API_KEY", "OPENROUTER_API_KEY", "NVAPI_KEY"]
+    keys = [
+        "AI_PROVIDER", "ANTHROPIC_API_KEY", "GEMINI_API_KEY", "OPENROUTER_API_KEY",
+        "NVAPI_KEY", "MISTRAL_API_KEY", "ZHIPU_API_KEY",
+    ]
     rows = db.query(SystemSetting).filter(SystemSetting.key.in_(keys)).all()
     by_key = {row.key: row.value for row in rows}
     return {
-        "provider": by_key.get("AI_PROVIDER") or "mock",
+        "provider": by_key.get("AI_PROVIDER") or "auto",
+        "mistral_key_set": bool(by_key.get("MISTRAL_API_KEY")),
+        "zhipu_key_set": bool(by_key.get("ZHIPU_API_KEY")),
         "anthropic_key_set": bool(by_key.get("ANTHROPIC_API_KEY")),
         "gemini_key_set": bool(by_key.get("GEMINI_API_KEY")),
         "openrouter_key_set": bool(by_key.get("OPENROUTER_API_KEY")),
