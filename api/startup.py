@@ -15,6 +15,7 @@ def run_migrations() -> None:
     from src.backend.tasks import models as _tm  # noqa
     from src.backend.comms import models as _cm  # noqa
     from src.backend.ai import embeddings_model as _em  # noqa
+    from src.backend.notifications import models as _nm  # noqa
 
     from src.backend.db import Base, engine
     from sqlalchemy.orm import Session

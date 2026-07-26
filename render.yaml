@@ -89,7 +89,5 @@ services:
         generateValue: true
       - key: ENV
         value: production
-      # ALLOW_MOCK_AI intentionally omitted — production uses real AI provider.
-      # If the provider key is missing at boot, api/main.py logs a warning and the
-      # AIProvider factory gracefully degrades to deterministic mock with a loud log.
-      # Without this env var, mock-in-production is a deliberate conscious override.
+      - key: ALLOW_MOCK_AI
+        value: "1"

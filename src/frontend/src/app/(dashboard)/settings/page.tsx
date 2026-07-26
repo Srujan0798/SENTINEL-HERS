@@ -5,9 +5,11 @@ import { useUser, useRole } from "@/lib/auth";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 
 import { Skeleton } from "@/components/ui/skeleton";
-import { Sun, Moon, Key, Bell, User as UserIcon, Mail, Slack, UserPlus, Shield, Clock, CalendarDays } from "lucide-react";
+import { Sun, Moon, Key, Bell, User as UserIcon, Mail, Slack, UserPlus, Shield, Clock, CalendarDays, Check, X } from "lucide-react";
 
 const API_BASE =
   process.env.NEXT_PUBLIC_API_BASE_URL ||
@@ -102,6 +104,15 @@ export default function SettingsPage() {
   const [notifEmail, setNotifEmail] = useState(true);
   const [notifSlack, setNotifSlack] = useState(false);
   const [notifPagerDuty, setNotifPagerDuty] = useState(false);
+  const [notifLoaded, setNotifLoaded] = useState(false);
+
+  // Invite member
+  const [inviteOpen, setInviteOpen] = useState(false);
+  const [inviteEmail, setInviteEmail] = useState("");
+  const [inviteName, setInviteName] = useState("");
+  const [inviteRole, setInviteRole] = useState("responder");
+  const [inviteMsg, setInviteMsg] = useState<{ ok: boolean; text: string } | null>(null);
+  const [inviting, setInviting] = useState(false);
 
   // API keys
   const [apiKey] = useState("sk-" + "•".repeat(40));
@@ -118,6 +129,8 @@ export default function SettingsPage() {
     document.documentElement.classList.toggle("dark", darkMode);
     localStorage.setItem("sentinel-theme", darkMode ? "dark" : "light");
   }, [darkMode]);
+
+  const token = typeof window !== "undefined" ? localStorage.getItem("access_token") || localStorage.getItem("sentinel_token") || "" : "";
 
   async function refresh() {
     setError(null);
@@ -137,6 +150,61 @@ export default function SettingsPage() {
       setDemo(null);
     } finally {
       setLoaded(true);
+    }
+    try {
+      const prefsRes = await fetch(`${API_BASE}/api/notifications/preferences`, {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      if (prefsRes.ok) {
+        const data = await prefsRes.json();
+        for (const p of data.preferences ?? []) {
+          if (p.channel === "email") setNotifEmail(p.enabled);
+          if (p.channel === "slack") setNotifSlack(p.enabled);
+          if (p.channel === "pagerduty") setNotifPagerDuty(p.enabled);
+        }
+      }
+    } catch {
+      // notification prefs non-critical
+    } finally {
+      setNotifLoaded(true);
+    }
+  }
+
+  async function handleInvite() {
+    if (!inviteEmail) return;
+    setInviting(true);
+    setInviteMsg(null);
+    try {
+      const res = await fetch(`${API_BASE}/auth/invite`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
+        body: JSON.stringify({ email: inviteEmail, name: inviteName, role_name: inviteRole }),
+      });
+      if (res.ok) {
+        setInviteMsg({ ok: true, text: `Invited ${inviteEmail}` });
+        setInviteEmail("");
+        setInviteName("");
+        setTimeout(() => { setInviteOpen(false); setInviteMsg(null); }, 1500);
+      } else {
+        const err = await res.json().catch(() => ({ detail: res.statusText }));
+        setInviteMsg({ ok: false, text: err.detail || "Invite failed" });
+      }
+    } catch {
+      setInviteMsg({ ok: false, text: "Network error" });
+    } finally {
+      setInviting(false);
+    }
+  }
+
+  async function saveNotif(channel: string, enabled: boolean) {
+    try {
+      await fetch(`${API_BASE}/api/notifications/preferences`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
+        body: JSON.stringify({ [channel]: enabled }),
+      });
+    } catch {
+      // silently fail — local state already updated
     }
   }
 
@@ -257,10 +325,41 @@ export default function SettingsPage() {
             <code className="text-xs truncate max-w-[200px]">{user?.team_id ?? "—"}</code>
           </div>
           <div className="pt-2 flex flex-col sm:flex-row gap-2">
-            <Button variant="default" size="sm" className="gap-1.5">
-              <UserPlus className="h-3.5 w-3.5" />
-              Invite member
-            </Button>
+            <Dialog open={inviteOpen} onOpenChange={setInviteOpen}>
+              <DialogTrigger asChild>
+                <Button variant="default" size="sm" className="gap-1.5">
+                  <UserPlus className="h-3.5 w-3.5" />
+                  Invite member
+                </Button>
+              </DialogTrigger>
+              <DialogContent>
+                <DialogHeader>
+                  <DialogTitle>Invite team member</DialogTitle>
+                </DialogHeader>
+                <div className="space-y-3 pt-2">
+                  <Input placeholder="Email" value={inviteEmail} onChange={(e) => setInviteEmail(e.target.value)} />
+                  <Input placeholder="Name (optional)" value={inviteName} onChange={(e) => setInviteName(e.target.value)} />
+                  <select
+                    className="flex h-9 w-full rounded-md border border-input bg-transparent px-3 py-1 text-sm shadow-sm"
+                    value={inviteRole} onChange={(e) => setInviteRole(e.target.value)}
+                  >
+                    <option value="admin">Admin</option>
+                    <option value="incident_commander">Incident Commander</option>
+                    <option value="responder">Responder</option>
+                    <option value="viewer">Viewer</option>
+                  </select>
+                  <Button className="w-full gap-1.5" onClick={handleInvite} disabled={inviting || !inviteEmail}>
+                    {inviting ? "Sending..." : <><UserPlus className="h-4 w-4" /> Send invite</>}
+                  </Button>
+                  {inviteMsg && (
+                    <p className={`text-xs flex items-center gap-1 ${inviteMsg.ok ? "text-green-600" : "text-destructive"}`}>
+                      {inviteMsg.ok ? <Check className="h-3 w-3" /> : <X className="h-3 w-3" />}
+                      {inviteMsg.text}
+                    </p>
+                  )}
+                </div>
+              </DialogContent>
+            </Dialog>
             <Button variant="outline" size="sm">
               Manage team
             </Button>
@@ -312,19 +411,19 @@ export default function SettingsPage() {
           </CardTitle>
         </CardHeader>
         <CardContent className="space-y-4 text-sm">
-          <ToggleSwitch checked={notifEmail} onChange={setNotifEmail} label="Email notifications" />
+          <ToggleSwitch checked={notifEmail} onChange={(v) => { setNotifEmail(v); saveNotif("email", v); }} label="Email notifications" />
           <div className="flex items-center gap-3">
             <Mail className="h-3.5 w-3.5 text-muted-foreground" />
             <span className="text-xs text-muted-foreground">{user?.email ?? "—"}</span>
           </div>
           <div className="border-t" />
-          <ToggleSwitch checked={notifSlack} onChange={setNotifSlack} label="Slack alerts" />
+          <ToggleSwitch checked={notifSlack} onChange={(v) => { setNotifSlack(v); saveNotif("slack", v); }} label="Slack alerts" />
           <div className="flex items-center gap-3">
             <Slack className="h-3.5 w-3.5 text-muted-foreground" />
             <span className="text-xs text-muted-foreground">#incidents channel</span>
           </div>
           <div className="border-t" />
-          <ToggleSwitch checked={notifPagerDuty} onChange={setNotifPagerDuty} label="PagerDuty escalation" />
+          <ToggleSwitch checked={notifPagerDuty} onChange={(v) => { setNotifPagerDuty(v); saveNotif("pagerduty", v); }} label="PagerDuty escalation" />
           <div className="flex items-center gap-3">
             <Bell className="h-3.5 w-3.5 text-muted-foreground" />
             <span className="text-xs text-muted-foreground">SEV1 / SEV2 only</span>
