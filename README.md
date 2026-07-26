@@ -114,13 +114,22 @@ Full local paths: [HOW_TO_RUN.md](HOW_TO_RUN.md) · Cloud deploy: [docs/DEPLOYME
 | Where | Variable | Notes |
 |-------|----------|--------|
 | Render | `ALLOW_MOCK_AI` | `1` to run AI features with deterministic mock (no API key needed for demo) |
-| Render | `NVAPI_KEY` | NVIDIA API key (primary AI provider) |
-| Render | `AI_PROVIDER` | `nvidia` (primary), falls back to `openrouter` → `claude` → `gemini` |
+| Render | `NVAPI_KEY` | NVIDIA API key |
+| Render | `AI_PROVIDER` | selects **one** provider: `claude` \| `gemini` \| `openrouter` \| `nvidia` \| `mock`. There is no automatic cross-provider fallback chain — whichever provider is selected is the one actually used, so it needs a valid key + model for that provider. |
 | Render | `CORS_ORIGINS` | exact Vercel origin, e.g. `https://foo.vercel.app` |
 | Render | `ENCRYPTION_KEY` | Fernet key for AI settings at rest |
 | Render | `ENABLE_HEALTH_PROBER` | `1` to enable health-check prober |
 | Vercel | `NEXT_PUBLIC_API_BASE_URL` | Render origin, no trailing slash |
 | Vercel project | **Root Directory** | `src/frontend` |
+
+### Bring your own AI key (for judges)
+
+Want to test SENTINEL's AI features (incident summaries, root-cause analysis,
+chat, postmortems) with your own key instead of whatever's configured on the
+live demo? Log in as an admin (the demo account is admin), go to **Settings →
+AI Provider**, pick Claude / Gemini / OpenRouter / NVIDIA, paste your API key,
+and hit Save. It takes effect immediately — no redeploy needed. Keys are
+Fernet-encrypted at rest and never displayed again after saving.
 
 ---
 

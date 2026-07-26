@@ -136,6 +136,11 @@ After deploying, the production URL served a stale prerendered shell. Vercel has
 
 All data is pre-seeded: 3 incidents (SEV1 investigating, SEV2 triaging, SEV3 resolved), 4 deployments, 5 service health records.
 
+**Want to test AI with your own key?** Log in as admin (the demo account is
+admin) → **Settings → AI Provider** → pick Claude / Gemini / OpenRouter / NVIDIA
+→ paste your key → Save. Takes effect immediately, no redeploy — the change is
+persisted encrypted at rest and applied to the running process right away.
+
 ---
 
 ## 7. Closing
