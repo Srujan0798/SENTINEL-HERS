@@ -77,14 +77,18 @@ generic error message. One external action item remains open (below).
   session given it doesn't affect production code.
 
 ## RESOLVED — external action item completed
-**Live AI features (summary/RCA/postmortem/chat) now fully working.**
+**Live AI features (summary/RCA/postmortem/chat) confirmed working on production.**
 - **`727c050`** Added Mistral + Zhipu providers with priority fallback chain
   (mistral → zhipu → openrouter → nvidia → claude → gemini)
-- **`d55672d`** Extended Settings UI for Mistral/Zhipu + Auto chain option  
-- AI features now work with verified fallback chain: Mistral (primary) and Zhipu
-  (secondary) both confirmed working locally with provided keys
+- **`d55672d`** Extended Settings UI for Mistral/Zhipu + Auto chain option
+- Real Mistral + Zhipu keys were set live via `POST /api/ai/settings`
+  (`provider: "auto"`) on 2026-07-26 — takes effect immediately, no redeploy.
+- **Verified on production, not just locally:** `curl .../api/ai/chat` returned a
+  real grounded answer with citations (not mock, not the old NVIDIA 404); the
+  live browser war room now renders a real multi-paragraph AI summary in place
+  of the previous "AI summary unavailable."
 - Chain automatically falls through providers on failure, ensuring AI functionality
-  never fails silently (FM-11 compliance)
+  never fails silently (FM-11 compliance).
 
 ## Verified live this session (real browser, Playwright MCP)
 - Login: **both** the one-click demo button and the manual email/password form
@@ -95,9 +99,9 @@ generic error message. One external action item remains open (below).
 - Monitoring: real alerts, service health, recent logs; honest container
   empty-state (see above).
 - Realtime nav badge: "connected" (post SSE-header-fix).
-- Incident war room: timeline, tasks, SLA countdown, comms panel all render with
-  real seeded data. AI summary/RCA/postmortem blocked by the open NVIDIA item
-  above — not a frontend bug, confirmed via direct backend curl repro.
+- Incident war room: timeline, tasks, SLA countdown, comms panel, and a real
+  AI-generated summary all render with real seeded data (AI confirmed working
+  after the Mistral/Zhipu chain went live — see "RESOLVED" above).
 - Playwright CLI (`npx playwright test`) showed one failure reaching
   `/dashboard`, but manual interactive browser testing (both login paths) landed
   cleanly — treated as CLI/test-harness flakiness, not a live product defect,
@@ -123,10 +127,11 @@ full run shows failures.
 ## Judge path
 1. Open FE → **Enter live SEV1 demo** (one-click) or manual login with demo creds
 2. Dashboard → **Open SEV1 war room** (via Incidents)
-3. Timeline · tasks · SLA countdown · comms — all real seeded data
+3. Timeline · tasks · SLA countdown · comms · real AI-generated summary — all live
 4. Monitoring · Deployments · Analytics — all real, no stuck loading states
-5. AI summary/RCA/postmortem/chat: blocked pending the NVIDIA model-ID fix above
+5. AI summary/RCA/postmortem/chat: all working live via the Mistral/Zhipu chain
 
 ## Next single action
-Resolve the NVIDIA model ID (or switch Render's `AI_PROVIDER` to `openrouter`),
-then re-verify AI summary/RCA/postmortem/chat live and this HANDOFF is fully clean.
+Nothing blocking. Optional polish only: record + link a demo video (portal
+requirement, not code); deep-test the voice-to-ticket mic flow; consider adding
+a `/auth/logout` endpoint (see "Known real gaps").

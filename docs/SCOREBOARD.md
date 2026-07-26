@@ -8,11 +8,11 @@ without evidence stays YELLOW, not GREEN.
 
 | Axis | W | Score | Band | R/Y/G | Evidence | Notes |
 |------|---|-------|------|-------|----------|-------|
-| Golden path & correctness | 25% | 90 | EXCELLENT | G | Playwright MCP interactive: login (both paths) → dashboard → incidents → war room, all real seeded data, 2026-07-26 | AI summary/RCA blocked by open NVIDIA item (see below); everything else renders |
+| Golden path & correctness | 25% | 92 | EXCELLENT | G | Playwright MCP interactive: login (both paths) → dashboard → incidents → war room with real AI summary rendered, 2026-07-26 | Full path verified end-to-end, including live AI |
 | Security & tenancy | 15% | 90 | EXCELLENT | G | Dedicated read-only security-review agent, 2026-07-26: no P0/P1. Every data route filters by JWT team_id. bcrypt + JWT rotation + RevokedToken blacklist confirmed | 1 P2 found+fixed (Fernet key regen bug, commit c734eaa). Real minor gaps: no /auth/logout, global (not per-team) webhook secret |
 | Architecture & data | 12% | 85 | EXCELLENT | G | FastAPI + SQLAlchemy + Pydantic, Alembic migrations, 18 tables, indexes | pgvector RAG confirmed real (parameterized queries) |
 | Reliability & realtime | 12% | 85 | EXCELLENT | G | SSE fixed+verified this session: local live-server repro of 401→200 fix (commit 3e1f1a9); live nav badge shows "connected" | Was a live showstopper before this session's fix — every browser SSE connection 401'd forever |
-| AI / integrations | 15% | 90 | EXCELLENT | G | Multi-provider fallback chain implemented (mistral → zhipu → openrouter → nvidia → claude → gemini), both Mistral and Zhipu verified working locally with provided keys, AI summary/RCA/postmortem/chat functionality confirmed operational | Chain fallback ensures AI never fails silently (FM-11 compliance), Settings UI extended for provider selection |
+| AI / integrations | 15% | 92 | EXCELLENT | G | Multi-provider fallback chain (mistral → zhipu → openrouter → nvidia → claude → gemini) confirmed live on production: `curl .../api/ai/chat` returns a real grounded answer with citations; live browser war room renders a real AI summary | Chain fallback ensures AI never fails silently (FM-11 compliance), Settings UI extended for provider selection |
 | UI/UX craft | 10% | 85 | EXCELLENT | G | Live browser walk of dashboard/analytics/monitoring/incidents, 2026-07-26 — no stuck loading states, honest empty states (containers panel) | |
 | Proof systems | 6% | 80 | GOOD | G | `bash scripts/verify_live.sh` → PASS, 2026-07-26; full test suite passes 100% per-file | Full combined-suite run has order-dependent flakiness (163-199 passed across reruns) — documented in HANDOFF, not hidden |
 | Docs & moat | 5% | 80 | GOOD | G | This file + HANDOFF.md rewritten from live re-verification, not carried-forward claims | |
@@ -25,7 +25,7 @@ resolved through multi-provider fallback chain ensuring robust AI functionality.
 |----|--------|----------|
 | Team auth + JWT + RBAC | REAL | Security review clean; register() creates isolated team, no cross-tenant bypass |
 | Real-time incident dashboard | REAL | Live browser walk, 2026-07-26 |
-| AI summaries + RCA | REAL | Multi-provider fallback chain (mistral → zhipu → openrouter → nvidia → claude → gemini), verified working locally with provided keys |
+| AI summaries + RCA | REAL | Multi-provider fallback chain (mistral → zhipu → openrouter → nvidia → claude → gemini), confirmed live on production (curl + browser) |
 | GitHub/GitLab webhooks | REAL | HMAC-verified (compare_digest), confirmed in security review |
 | Service health monitoring | REAL | Live Monitoring page, real alerts + service health |
 | Per-incident comms | REAL | Live war room comms panel with seeded message |
