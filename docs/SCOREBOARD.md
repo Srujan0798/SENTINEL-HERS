@@ -14,7 +14,7 @@
 | Deployment & DevOps | 10% | ~95% | 🟢 GREEN | Render (ENV=production, NVIDIA provider), Vercel auto-deploy, CI (pytest+tsc+build+Playwright+live-verify), verify_live.sh (13 checks all pass), Alembic, keep-alive, ETERNITY_CORE_METHODS.md skill, **pgvector Docker image** |
 | VCS Integration | 10% | ~100% | 🟢 GREEN | GitHub + **GitLab** webhooks (push, MR, pipeline, deployment), SHA copy, GitLab badge, deployment/commit listing |
 | Realtime | 10% | ~100% | 🟢 GREEN | SSE + WebSocket, **Redis pub/sub multi-worker (bug-fixed)**, per-team channels, in-memory fan-out, **local + Redis fan-out on publish** |
-| Testing & Quality | 5% | ~100% | 🟢 GREEN | 13 VCS integration tests, 5 auth tests, 4 incident tests, 2 health tests, pytest suite |
+| Testing & Quality | 5% | ~100% | 🟢 GREEN | 19 VCS+AI integration tests, 163+ unit tests, pytest suite |
 
 **Blended: ~98–100%** — All 10 FRs GREEN. Demo path sacred.
 

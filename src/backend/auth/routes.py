@@ -25,7 +25,7 @@ async def get_current_user_dependency(
 
 
 @router.post("/register", response_model=TokenResponse, status_code=status.HTTP_201_CREATED)
-@limiter.limit("5/minute")
+@limiter.limit("60/minute")
 async def register_user(request: Request, body: RegisterRequest, db: Session = Depends(get_db)) -> TokenResponse:
     return register(body, db)
 

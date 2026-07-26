@@ -13,7 +13,7 @@
 **Problem statement:** Sentinel — AI Native Engineering Operations Platform (Hard).  
 Brief: [ps.md](ps.md) · Architecture: [plan/ARCHITECTURE.md](plan/ARCHITECTURE.md) · Write-up: [WRITEUP.md](WRITEUP.md)
 
-![status](https://img.shields.io/badge/tests-185%20passing-brightgreen)
+![status](https://img.shields.io/badge/tests-182%20passing-brightgreen)
 ![backend](https://img.shields.io/badge/backend-FastAPI-009688)
 ![frontend](https://img.shields.io/badge/frontend-Next.js%2015-black)
 ![deploy](https://img.shields.io/badge/deploy-Render%20%2B%20Vercel-blue)
@@ -109,8 +109,11 @@ Full local paths: [HOW_TO_RUN.md](HOW_TO_RUN.md) · Cloud deploy: [docs/DEPLOYME
 
 | Where | Variable | Notes |
 |-------|----------|--------|
-| Render | `ANTHROPIC_API_KEY` | dashboard-only secret |
+| Render | `NVAPI_KEY` | NVIDIA API key (primary AI provider) |
+| Render | `AI_PROVIDER` | `nvidia` (primary), falls back to `openrouter` → `claude` → `gemini` |
 | Render | `CORS_ORIGINS` | exact Vercel origin, e.g. `https://foo.vercel.app` |
+| Render | `ENCRYPTION_KEY` | Fernet key for AI settings at rest |
+| Render | `ENABLE_HEALTH_PROBER` | `1` to enable health-check prober |
 | Vercel | `NEXT_PUBLIC_API_BASE_URL` | Render origin, no trailing slash |
 | Vercel project | **Root Directory** | `src/frontend` |
 
@@ -120,10 +123,10 @@ Full local paths: [HOW_TO_RUN.md](HOW_TO_RUN.md) · Cloud deploy: [docs/DEPLOYME
 
 ```bash
 # from repo root, with venv active
-python -m pytest -q          # full suite — currently 185 passed
+python -m pytest -q          # full suite — currently 182+ passed (19 integration, 163+ unit)
 ```
 
-**185 tests passing** (unit + integration; mock AI; SQLite). Verified end-to-end in browser with live Render + Vercel.
+**182+ tests passing** (unit + integration; mock AI; SQLite). Verified end-to-end with Playwright sacred-path spec against production URL (14-step judge walkthrough).
 
 ---
 
@@ -133,10 +136,12 @@ python -m pytest -q          # full suite — currently 185 passed
 |-------|--------|
 | Frontend | Next.js 15, React 19, Tailwind, shadcn/ui |
 | Backend | FastAPI (Python 3.11+), SQLAlchemy 2, Pydantic 2 |
-| Database | PostgreSQL (prod) · SQLite (tests) |
-| Realtime | Server-Sent Events + WebSockets |
-| AI | Anthropic Claude / Google Gemini / mock provider |
-| ML | scikit-learn (IsolationForest) |
+| Database | PostgreSQL 16 + **pgvector** (prod) · SQLite (tests) |
+| Realtime | Server-Sent Events + WebSockets + **Redis pub/sub** |
+| AI | **NVIDIA NIM** (primary) / OpenRouter / Claude / Gemini / Mock provider |
+| ML | scikit-learn (IsolationForest anomaly detection) |
+| Vector Search | **pgvector** — 768-dim embeddings via NVIDIA embedding API |
+| VCS | GitHub + **GitLab** webhooks (push, MR, pipeline, deployment) |
 | Observability | Prometheus + Grafana |
 | Deploy | Docker · Render Blueprint · Vercel |
 

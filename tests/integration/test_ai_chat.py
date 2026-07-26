@@ -52,7 +52,7 @@ def setup_db():
     Path("test_ai_chat.db").unlink(missing_ok=True)
 
 
-@pytest.fixture
+@pytest.fixture(scope="class")
 def team_a():
     _ctr[0] += 1
     resp = client.post("/auth/register", json={
@@ -61,7 +61,7 @@ def team_a():
         "name": "Team A User",
         "team_name": f"Chat Team A {_ctr[0]}",
     })
-    assert resp.status_code == 201
+    assert resp.status_code == 201, f"team_a register failed: {resp.text}"
     data = resp.json()
     return {
         "headers": {"Authorization": f"Bearer {data['access_token']}"},
@@ -70,7 +70,7 @@ def team_a():
     }
 
 
-@pytest.fixture
+@pytest.fixture(scope="class")
 def team_b():
     _ctr[0] += 1
     resp = client.post("/auth/register", json={
@@ -79,7 +79,7 @@ def team_b():
         "name": "Team B User",
         "team_name": f"Chat Team B {_ctr[0]}",
     })
-    assert resp.status_code == 201
+    assert resp.status_code == 201, f"team_b register failed: {resp.text}"
     data = resp.json()
     return {
         "headers": {"Authorization": f"Bearer {data['access_token']}"},
