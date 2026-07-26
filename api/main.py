@@ -1,6 +1,9 @@
+import asyncio as _asyncio
 import logging
 import os
 import sys
+from contextlib import asynccontextmanager
+from datetime import datetime, timezone
 from fastapi import FastAPI, Request, status
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
@@ -14,7 +17,84 @@ logger = logging.getLogger(__name__)
 
 limiter = Limiter(key_func=get_remote_address, default_limits=["200/minute"])
 
-app = FastAPI(title="SENTINEL API", version="1.0.0", docs_url="/api/docs", redoc_url="/api/redoc")
+
+# --------------------------------------------------------------------------- #
+# Background task definitions (defined before lifespan so they can be started)
+# --------------------------------------------------------------------------- #
+
+async def _cleanup_expired_tokens():
+    """Purge expired RevokedToken rows every 6 hours."""
+    while True:
+        try:
+            from src.backend.db import SessionLocal
+            from src.backend.shared_models import RevokedToken
+            db = SessionLocal()
+            try:
+                cut = datetime.now(timezone.utc)
+                deleted = db.query(RevokedToken).filter(RevokedToken.expires_at < cut).delete()
+                if deleted:
+                    db.commit()
+                    logger.info("Cleaned %d expired revoked tokens", deleted)
+            finally:
+                db.close()
+        except Exception as e:
+            logger.warning("Token cleanup failed: %s", e)
+        await _asyncio.sleep(21600)
+
+
+async def _background_embed_loop():
+    """Catch up on unembedded logs every 30 minutes."""
+    await _asyncio.sleep(120)  # wait for app to settle
+    while True:
+        try:
+            from src.backend.db import SessionLocal
+            from src.backend.ai.embeddings import embed_recent_logs
+            from src.backend.shared_models import TeamModel
+            db = SessionLocal()
+            try:
+                teams = db.query(TeamModel).all()
+                for team in teams:
+                    try:
+                        n = embed_recent_logs(db, str(team.id), limit=50)
+                        if n:
+                            logger.info("Embedded %d logs for team %s", n, team.id)
+                    except Exception as team_err:
+                        logger.warning("Embedding for team %s failed: %s", team.id, team_err)
+            finally:
+                db.close()
+        except Exception as e:
+            logger.warning("Background embedding failed: %s", e)
+        await _asyncio.sleep(1800)
+
+
+async def _health_prober_loop():
+    """Run health probing if enabled."""
+    from src.backend.health.prober import start_health_prober
+    await start_health_prober()
+
+
+# --------------------------------------------------------------------------- #
+# Lifecycle manager
+# --------------------------------------------------------------------------- #
+
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    """Start background tasks once the event loop is running; cancel on shutdown."""
+    tasks = [_asyncio.create_task(_cleanup_expired_tokens()), _asyncio.create_task(_background_embed_loop())]
+    if os.getenv("ENABLE_HEALTH_PROBER", "0").lower() in ("1", "true", "yes"):
+        tasks.append(_asyncio.create_task(_health_prober_loop()))
+    logger.info("Background tasks started: cleanup, embedding%s", ", health" if len(tasks) > 2 else "")
+    yield
+    for t in tasks:
+        t.cancel()
+    await _asyncio.gather(*tasks, return_exceptions=True)
+
+
+# --------------------------------------------------------------------------- #
+# App construction
+# --------------------------------------------------------------------------- #
+
+app = FastAPI(title="SENTINEL API", version="1.0.0", docs_url="/api/docs", redoc_url="/api/redoc", lifespan=lifespan)
 app.state.limiter = limiter
 app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)
 app.add_middleware(SlowAPIMiddleware)
@@ -128,13 +208,3 @@ app.include_router(seed_router)
 # Realtime SSE + WebSocket (StatusBar / Comms live updates)
 from src.backend.realtime.router import router as realtime_router
 app.include_router(realtime_router, prefix="/api")
-
-# Start health prober as background task if enabled
-if os.getenv("ENABLE_HEALTH_PROBER", "0").lower() in ("1", "true", "yes"):
-    try:
-        from src.backend.health.prober import start_health_prober
-        import asyncio
-        asyncio.create_task(start_health_prober())
-        logger.info("Health prober started (background)")
-    except Exception as e:
-        logger.warning("Health prober not started: %s", e)

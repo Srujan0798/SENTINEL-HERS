@@ -252,6 +252,20 @@ async def ai_chat(
     try:
         from src.backend.ai.chat.service import chat
 
+        # Try vector search first, fall back to keyword-ranked logs
+        try:
+            from src.backend.ai.embeddings import search_similar_logs, embed_recent_logs
+            vector_logs = search_similar_logs(body.question, team_id, db)
+            if vector_logs:
+                logs = vector_logs
+            else:
+                embed_recent_logs(db, team_id)
+                vector_logs = search_similar_logs(body.question, team_id, db)
+                if vector_logs:
+                    logs = vector_logs
+        except Exception:
+            pass  # keyword fallback via chat service _rerank_logs
+
         result = chat(
             team_id=team_id,
             user_message=body.question,
@@ -296,6 +310,33 @@ async def ai_chat_stream(
             Incident.team_id == team_id,
         ).order_by(Incident.created_at.desc()).limit(10).all()
         incidents = [_serialize_incident(i) for i in recent]
+        log_rows = db.query(LogEntryModel).filter(
+            LogEntryModel.team_id == team_id,
+        ).order_by(LogEntryModel.created_at.desc()).limit(50).all()
+        logs = [
+            {
+                "id": str(r.id),
+                "service": r.service,
+                "level": r.level,
+                "message": r.message,
+                "created_at": r.created_at.isoformat() if r.created_at else None,
+            }
+            for r in log_rows
+        ]
+
+    # Try vector search first, fall back to keyword-ranked logs
+    try:
+        from src.backend.ai.embeddings import search_similar_logs, embed_recent_logs
+        vector_logs = search_similar_logs(body.question, team_id, db)
+        if vector_logs:
+            logs = vector_logs
+        else:
+            embed_recent_logs(db, team_id)
+            vector_logs = search_similar_logs(body.question, team_id, db)
+            if vector_logs:
+                logs = vector_logs
+    except Exception:
+        pass  # keyword fallback via _build_chat_context order
 
     context, citations = _build_chat_context(incidents, logs)
     system = (

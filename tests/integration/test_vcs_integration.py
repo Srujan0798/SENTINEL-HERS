@@ -63,7 +63,8 @@ def setup_db():
 
 _counter = [0]
 
-@pytest.fixture
+
+@pytest.fixture(scope="class")
 def auth():
     _counter[0] += 1
     email = f"vcs{_counter[0]}@sentinel.io"
@@ -71,7 +72,7 @@ def auth():
         "email": email, "password": "testpassword123",
         "name": "VCS Tester", "team_name": "VCS Team",
     })
-    assert resp.status_code == 201
+    assert resp.status_code == 201, f"Auth registration failed: {resp.text}"
     data = resp.json()
     return {
         "headers": {"Authorization": f"Bearer {data['access_token']}"},
@@ -173,6 +174,70 @@ class TestGitLabWebhook:
             headers={"X-Gitlab-Token": "wrong", "Content-Type": "application/json"},
         )
         assert resp.status_code == 401
+
+    def test_merge_request_event_accepted(self, auth):
+        payload = {
+            "object_kind": "merge_request",
+            "project": {"name": "api-service"},
+            "user": {"name": "Dave"},
+            "object_attributes": {
+                "iid": 42,
+                "title": "Add rate limiting",
+                "source_branch": "feat/rate-limit",
+                "target_branch": "main",
+                "action": "open",
+                "last_commit": {"id": "ddd444"},
+            },
+        }
+        body = json.dumps(payload).encode()
+        resp = client.post(
+            "/api/integrations/gitlab/webhook",
+            content=body,
+            params={"team_id": auth["team_id"]},
+            headers={"X-Gitlab-Token": "test-gitlab-token", "X-Gitlab-Event": "Merge Request Hook", "Content-Type": "application/json"},
+        )
+        assert resp.status_code == 202
+
+    def test_pipeline_event_creates_deployment(self, auth):
+        payload = {
+            "object_kind": "pipeline",
+            "project": {"name": "worker-svc"},
+            "object_attributes": {
+                "id": 999,
+                "status": "success",
+                "ref": "refs/heads/main",
+                "sha": "eee555",
+            },
+        }
+        body = json.dumps(payload).encode()
+        resp = client.post(
+            "/api/integrations/gitlab/webhook",
+            content=body,
+            params={"team_id": auth["team_id"]},
+            headers={"X-Gitlab-Token": "test-gitlab-token", "X-Gitlab-Event": "Pipeline Hook", "Content-Type": "application/json"},
+        )
+        assert resp.status_code == 202
+
+        # Verify the deployment was created
+        resp = client.get("/api/integrations/deployments", headers=auth["headers"])
+        assert resp.status_code == 200
+        assert any(d.get("sha") == "eee555" for d in resp.json())
+
+    def test_deployment_event_accepted(self, auth):
+        payload = {
+            "project": {"name": "worker-svc"},
+            "environment": "production",
+            "sha": "fff666",
+            "status": "running",
+        }
+        body = json.dumps(payload).encode()
+        resp = client.post(
+            "/api/integrations/gitlab/webhook",
+            content=body,
+            params={"team_id": auth["team_id"]},
+            headers={"X-Gitlab-Token": "test-gitlab-token", "X-Gitlab-Event": "Deployment Hook", "Content-Type": "application/json"},
+        )
+        assert resp.status_code == 202
 
 
 class TestDeploymentListing:

@@ -95,9 +95,11 @@ class RealtimeHub:
             entry = ConnectionEntry(team_id=team_id, user_id="")
             self._connections.setdefault(team_id, []).append(entry)
 
-            if self._redis and self._pubsub and not self._listener_task:
-                await self._pubsub.subscribe(**{f"team:{team_id}": self._on_redis_message})
-                self._listener_task = asyncio.create_task(self._redis_listener())
+            if self._redis and self._pubsub:
+                channel = f"team:{team_id}"
+                await self._pubsub.subscribe(channel)
+                if not self._listener_task:
+                    self._listener_task = asyncio.create_task(self._redis_listener())
 
             logger.debug("Client subscribed to team %s (total: %d)", team_id, self.connection_count)
             return entry
@@ -113,16 +115,19 @@ class RealtimeHub:
         logger.debug("Client unsubscribed from team %s", entry.team_id)
 
     async def publish(self, team_id: str, event_type: str, payload: dict[str, Any]):
-        """Broadcast an event to all connected clients of a team."""
+        """Broadcast an event to all connected clients of a team.
+
+        Fans out to both Redis pub/sub (cross-worker) AND local in-memory
+        connections (same-worker) so every client receives the event exactly once.
+        """
         event = RealtimeEvent(event_type=event_type, payload=payload, team_id=team_id)
 
         if self._redis:
             channel = f"team:{team_id}"
             message = json.dumps(event.to_dict())
             await self._redis.publish(channel, message)
-            return
 
-        # In-memory fan-out
+        # Always fan-out to local connections (even when Redis is active)
         conns = self._connections.get(team_id, [])
         for conn in conns:
             try:

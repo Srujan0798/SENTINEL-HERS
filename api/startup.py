@@ -14,9 +14,19 @@ def run_migrations() -> None:
     from src.backend.integrations.github import models as _gm  # noqa
     from src.backend.tasks import models as _tm  # noqa
     from src.backend.comms import models as _cm  # noqa
+    from src.backend.ai import embeddings_model as _em  # noqa
 
     from src.backend.db import Base, engine
     from sqlalchemy.orm import Session
+
+    # Enable pgvector extension (idempotent — silently skipped if not available)
+    try:
+        from sqlalchemy import text as _sa_text
+        with engine.connect() as conn:
+            conn.execute(_sa_text("CREATE EXTENSION IF NOT EXISTS vector"))
+            conn.commit()
+    except Exception:
+        pass  # vector extension not available (SQLite or pgvector not installed)
 
     Base.metadata.create_all(bind=engine)
 
@@ -75,6 +85,8 @@ def _ensure_indexes(engine) -> None:
         "CREATE INDEX IF NOT EXISTS idx_alerts_team_id ON alerts(team_id)",
         "CREATE INDEX IF NOT EXISTS idx_deployments_team_id ON deployments(team_id)",
         "CREATE INDEX IF NOT EXISTS idx_deployments_deployed_at ON deployments(deployed_at)",
+        "CREATE INDEX IF NOT EXISTS idx_log_embeddings_team_id ON log_embeddings(team_id)",
+        "CREATE INDEX IF NOT EXISTS idx_log_embeddings_vector ON log_embeddings USING hnsw (embedding vector_cosine_ops)",
     ]
     with engine.connect() as conn:
         for stmt in indexes:

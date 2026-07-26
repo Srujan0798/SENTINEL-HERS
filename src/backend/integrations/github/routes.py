@@ -173,6 +173,73 @@ async def gitlab_webhook(
             db.add(c)
         db.commit()
 
+    elif event in ("merge_request", "Merge Request Hook"):
+        attrs = payload.get("object_attributes", {})
+        repo_name = payload.get("project", {}).get("name", "unknown")
+        action = attrs.get("action", "open")
+        source_branch = attrs.get("source_branch", "")
+        target_branch = attrs.get("target_branch", "")
+        mr_title = attrs.get("title", "")
+
+        db.add(Commit(
+            id=str(uuid.uuid4()),
+            team_id=team_id,
+            sha=attrs.get("last_commit", {}).get("id", ""),
+            message=f"Merge Request !{attrs.get('iid', '')}: {mr_title} ({source_branch}→{target_branch})",
+            author=payload.get("user", {}).get("name", ""),
+            service=repo_name,
+            branch=target_branch,
+            source="gitlab",
+            committed_at=datetime.utcnow(),
+        ))
+        db.commit()
+
+        try:
+            from src.backend.realtime.hub import get_hub
+            import asyncio
+            hub = get_hub()
+            asyncio.create_task(hub.publish(team_id, "deployment.created", {
+                "service": repo_name, "event": "merge_request", "action": action,
+                "source_branch": source_branch, "target_branch": target_branch,
+                "title": mr_title, "source": "gitlab",
+            }))
+        except Exception:
+            logger.warning("Failed to publish MR realtime event")
+
+    elif event in ("pipeline", "Pipeline Hook"):
+        attrs = payload.get("object_attributes", {})
+        repo_name = payload.get("project", {}).get("name", "unknown")
+        pipeline_status = attrs.get("status", "pending")
+        pipeline_ref = attrs.get("ref", "")
+        pipeline_sha = attrs.get("sha", "")
+
+        dep = Deployment(
+            id=str(uuid.uuid4()),
+            team_id=team_id,
+            service=repo_name,
+            environment="staging" if "staging" in pipeline_ref else "production",
+            version=pipeline_ref.replace("refs/heads/", ""),
+            sha=pipeline_sha,
+            status=pipeline_status,
+            source="gitlab",
+            deployed_by="gitlab-ci",
+            deployed_at=datetime.utcnow(),
+            metadata_={"pipeline_id": str(attrs.get("id", "")), "ref": pipeline_ref},
+        )
+        db.add(dep)
+        db.commit()
+
+        try:
+            from src.backend.realtime.hub import get_hub
+            import asyncio
+            hub = get_hub()
+            asyncio.create_task(hub.publish(team_id, "deployment.created", {
+                "id": dep.id, "service": dep.service, "status": dep.status,
+                "source": "gitlab", "event": "pipeline",
+            }))
+        except Exception:
+            logger.warning("Failed to publish pipeline realtime event")
+
     return {"status": "accepted", "event": event}
 
 
