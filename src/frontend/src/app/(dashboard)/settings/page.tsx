@@ -123,6 +123,13 @@ export default function SettingsPage() {
   // Notification channel configs
   const [channels, setChannels] = useState<{ channel: string; configured: boolean; hint: string }[]>([]);
 
+  // AI provider settings (bring-your-own-key)
+  const [aiProvider, setAiProvider] = useState("mock");
+  const [aiKeyInput, setAiKeyInput] = useState("");
+  const [aiKeysSet, setAiKeysSet] = useState<Record<string, boolean>>({});
+  const [aiSaving, setAiSaving] = useState(false);
+  const [aiMsg, setAiMsg] = useState<{ ok: boolean; text: string } | null>(null);
+
   useEffect(() => {
     const stored = localStorage.getItem("sentinel-theme");
     const prefersDark = window.matchMedia("(prefers-color-scheme: dark)").matches;
@@ -186,6 +193,55 @@ export default function SettingsPage() {
       });
       if (chRes.ok) setChannels(await chRes.json());
     } catch { /* non-critical */ }
+    try {
+      const aiRes = await fetch(`${API_BASE}/api/ai/settings`, {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      if (aiRes.ok) {
+        const data = await aiRes.json();
+        setAiProvider(data.provider ?? "mock");
+        setAiKeysSet({
+          anthropic: !!data.anthropic_key_set,
+          gemini: !!data.gemini_key_set,
+          openrouter: !!data.openrouter_key_set,
+          nvidia: !!data.nvapi_key_set,
+        });
+      }
+    } catch { /* non-critical — most likely non-admin, endpoint is admin-only */ }
+  }
+
+  const AI_PROVIDER_FIELD: Record<string, string> = {
+    claude: "anthropic_key",
+    gemini: "gemini_key",
+    openrouter: "openrouter_key",
+    nvidia: "nvapi_key",
+  };
+
+  async function handleSaveAiSettings() {
+    setAiSaving(true);
+    setAiMsg(null);
+    try {
+      const body: Record<string, string> = { provider: aiProvider };
+      const field = AI_PROVIDER_FIELD[aiProvider];
+      if (field && aiKeyInput) body[field] = aiKeyInput;
+      const res = await fetch(`${API_BASE}/api/ai/settings`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
+        body: JSON.stringify(body),
+      });
+      if (res.ok) {
+        setAiMsg({ ok: true, text: `Saved — AI_PROVIDER=${aiProvider} is now active.` });
+        setAiKeyInput("");
+        if (field) setAiKeysSet((prev) => ({ ...prev, [aiProvider]: true }));
+      } else {
+        const err = await res.json().catch(() => ({}));
+        setAiMsg({ ok: false, text: err?.detail ? String(err.detail) : `Save failed (${res.status}) — admin role required.` });
+      }
+    } catch {
+      setAiMsg({ ok: false, text: "Could not reach the API." });
+    } finally {
+      setAiSaving(false);
+    }
   }
 
   async function handleCreateKey() {
@@ -437,6 +493,62 @@ export default function SettingsPage() {
               <option value="read_write">Read/Write</option>
             </select>
             <Button size="sm" variant="outline" onClick={handleCreateKey} disabled={!newKeyName}>Generate</Button>
+          </div>
+        </CardContent>
+      </Card>
+
+      {/* AI Provider — bring your own key */}
+      <Card>
+        <CardHeader>
+          <CardTitle className="text-base flex items-center gap-2">
+            <Key className="h-4 w-4" />
+            AI Provider
+          </CardTitle>
+        </CardHeader>
+        <CardContent className="space-y-3 text-sm">
+          <p className="text-xs text-muted-foreground">
+            Want to test with your own AI key? Pick a provider, paste your key, and save —
+            it takes effect immediately for AI summaries, root-cause analysis, chat, and
+            postmortems. Admin role required. Keys are encrypted at rest and never shown again.
+          </p>
+          <div className="flex items-center gap-2">
+            <span className="text-xs text-muted-foreground w-20 shrink-0">Provider</span>
+            <select
+              className="flex h-8 rounded-md border border-input bg-transparent px-2 text-xs"
+              value={aiProvider}
+              onChange={(e) => setAiProvider(e.target.value)}
+            >
+              <option value="mock">Mock (no key needed)</option>
+              <option value="claude">Claude (Anthropic)</option>
+              <option value="gemini">Gemini (Google)</option>
+              <option value="openrouter">OpenRouter</option>
+              <option value="nvidia">NVIDIA NIM</option>
+            </select>
+            {aiProvider !== "mock" && aiKeysSet[aiProvider] && (
+              <Badge variant="secondary" className="text-[10px]">key on file</Badge>
+            )}
+          </div>
+          {aiProvider !== "mock" && (
+            <div className="flex items-center gap-2">
+              <span className="text-xs text-muted-foreground w-20 shrink-0">API key</span>
+              <input
+                type="password"
+                className="flex h-8 w-full rounded-md border border-input bg-transparent px-3 py-1 text-xs shadow-sm"
+                placeholder={aiKeysSet[aiProvider] ? "Leave blank to keep current key" : "Paste your API key"}
+                value={aiKeyInput}
+                onChange={(e) => setAiKeyInput(e.target.value)}
+              />
+            </div>
+          )}
+          <div className="flex items-center gap-3">
+            <Button size="sm" variant="outline" onClick={handleSaveAiSettings} disabled={aiSaving}>
+              {aiSaving ? "Saving…" : "Save"}
+            </Button>
+            {aiMsg && (
+              <span className={`text-xs ${aiMsg.ok ? "text-emerald-600 dark:text-emerald-400" : "text-red-600 dark:text-red-400"}`}>
+                {aiMsg.text}
+              </span>
+            )}
           </div>
         </CardContent>
       </Card>

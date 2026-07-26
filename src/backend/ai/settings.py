@@ -81,6 +81,8 @@ def load_ai_settings_from_db(db: Session) -> None:
 def save_ai_settings(
     db: Session,
     provider: str | None = None,
+    anthropic_key: str | None = None,
+    gemini_key: str | None = None,
     openrouter_key: str | None = None,
     nvapi_key: str | None = None,
 ) -> None:
@@ -88,6 +90,10 @@ def save_ai_settings(
     pairs = {}
     if provider:
         pairs["AI_PROVIDER"] = provider
+    if anthropic_key:
+        pairs["ANTHROPIC_API_KEY"] = anthropic_key
+    if gemini_key:
+        pairs["GEMINI_API_KEY"] = gemini_key
     if openrouter_key:
         pairs["OPENROUTER_API_KEY"] = openrouter_key
     if nvapi_key:

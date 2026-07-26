@@ -23,6 +23,8 @@ router = APIRouter(prefix="/api/ai", tags=["ai"])
 
 class AISettingsRequest(BaseModel):
     provider: str = "openrouter"
+    anthropic_key: str = ""
+    gemini_key: str = ""
     openrouter_key: str = ""
     nvapi_key: str = ""
 
@@ -38,6 +40,8 @@ async def set_ai_settings(
     save_ai_settings(
         db,
         provider=body.provider,
+        anthropic_key=body.anthropic_key or None,
+        gemini_key=body.gemini_key or None,
         openrouter_key=body.openrouter_key or None,
         nvapi_key=body.nvapi_key or None,
     )
@@ -51,10 +55,16 @@ async def get_ai_settings(
 ):
     from src.backend.shared_models import SystemSetting
 
-    rows = db.query(SystemSetting).filter(
-        SystemSetting.key.in_(["AI_PROVIDER", "OPENROUTER_API_KEY", "NVAPI_KEY"])
-    ).all()
-    return {row.key: "***set***" if row.value else None for row in rows}
+    keys = ["AI_PROVIDER", "ANTHROPIC_API_KEY", "GEMINI_API_KEY", "OPENROUTER_API_KEY", "NVAPI_KEY"]
+    rows = db.query(SystemSetting).filter(SystemSetting.key.in_(keys)).all()
+    by_key = {row.key: row.value for row in rows}
+    return {
+        "provider": by_key.get("AI_PROVIDER") or "mock",
+        "anthropic_key_set": bool(by_key.get("ANTHROPIC_API_KEY")),
+        "gemini_key_set": bool(by_key.get("GEMINI_API_KEY")),
+        "openrouter_key_set": bool(by_key.get("OPENROUTER_API_KEY")),
+        "nvapi_key_set": bool(by_key.get("NVAPI_KEY")),
+    }
 
 
 class RootCauseResponse(BaseModel):
