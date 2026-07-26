@@ -104,7 +104,6 @@ export default function SettingsPage() {
   const [notifEmail, setNotifEmail] = useState(true);
   const [notifSlack, setNotifSlack] = useState(false);
   const [notifPagerDuty, setNotifPagerDuty] = useState(false);
-  const [notifLoaded, setNotifLoaded] = useState(false);
 
   // Invite member
   const [inviteOpen, setInviteOpen] = useState(false);
@@ -178,8 +177,6 @@ export default function SettingsPage() {
       }
     } catch {
       // notification prefs non-critical
-    } finally {
-      setNotifLoaded(true);
     }
     try {
       const keysRes = await fetch(`${API_BASE}/api/keys`, {
@@ -482,7 +479,7 @@ export default function SettingsPage() {
           ))}
           {createdKey && (
             <div className="bg-amber-50 dark:bg-amber-950 border border-amber-200 dark:border-amber-800 rounded p-2 text-xs">
-              <p className="font-medium mb-1">Key created — copy it now, it won't be shown again:</p>
+              <p className="font-medium mb-1">Key created — copy it now, it won&apos;t be shown again:</p>
               <code className="break-all select-all font-mono">{createdKey}</code>
             </div>
           )}
