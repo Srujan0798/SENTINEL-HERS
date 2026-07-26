@@ -20,6 +20,7 @@ out/
 
 # Databases (regenerated at runtime / by tests)
 *.db
+*.db-journal
 *.sqlite
 *.sqlite3
 
@@ -33,6 +34,7 @@ attic/
 
 # Build artifacts
 *.zip
+test-results/
 
 # OS
 .DS_Store

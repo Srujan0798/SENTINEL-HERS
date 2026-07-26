@@ -1,7 +1,6 @@
 import asyncio as _asyncio
 import logging
 import os
-import sys
 from contextlib import asynccontextmanager
 from datetime import datetime, timezone
 from fastapi import FastAPI, Request, status
@@ -98,19 +97,20 @@ app.state.limiter = limiter
 app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)
 app.add_middleware(SlowAPIMiddleware)
 
-# Production AI check: fail boot if AI_PROVIDER is mock or keys missing (unless ALLOW_MOCK_AI=1)
+# Warn but don't block boot — AI settings may be restored from DB in startup.
+# The runtime check in get_provider() handles missing keys gracefully (falls back
+# to MockProvider with a loud warning). The old sys.exit(1) pattern broke the
+# DB-persistence flow where keys live in the database, not env vars.
 _is_prod = os.getenv("ENV", "development").lower() in ("production", "prod")
 if _is_prod:
     _ai_provider = os.getenv("AI_PROVIDER", "mock").lower()
     _allow_mock = os.getenv("ALLOW_MOCK_AI", "0").lower() in ("1", "true", "yes")
     if _ai_provider == "mock" and not _allow_mock:
-        logger.error("AI_PROVIDER=mock in production. Set a real provider or ALLOW_MOCK_AI=1 for emergency.")
-        sys.exit(1)
+        logger.warning("AI_PROVIDER=mock in production. Set a real provider or ALLOW_MOCK_AI=1.")
     _key_map = {"claude": "ANTHROPIC_API_KEY", "gemini": "GEMINI_API_KEY", "openrouter": "OPENROUTER_API_KEY", "nvidia": "NVAPI_KEY"}
     _needed_key = _key_map.get(_ai_provider)
     if _needed_key and not os.getenv(_needed_key):
-        logger.error("AI_PROVIDER=%s but %s is not set in production.", _ai_provider, _needed_key)
-        sys.exit(1)
+        logger.warning("AI_PROVIDER=%s but %s is not set. Will try DB restore in startup.", _ai_provider, _needed_key)
 
 # Run DB migrations + optional demo auto-seed before handling any request
 try:

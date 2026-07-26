@@ -15,8 +15,46 @@ from src.backend.auth.dependencies import get_current_user_dependency
 from src.backend.db import get_db
 from src.backend.incidents.models import Incident
 from src.backend.logs.models import LogEntryModel, AlertModel
+from src.backend.rbac.dependencies import require_role
+from src.backend.rbac.models import Role, UserContext
 
 router = APIRouter(prefix="/api/ai", tags=["ai"])
+
+
+class AISettingsRequest(BaseModel):
+    provider: str = "openrouter"
+    openrouter_key: str = ""
+    nvapi_key: str = ""
+
+
+@router.post("/settings")
+async def set_ai_settings(
+    body: AISettingsRequest,
+    db: Session = Depends(get_db),
+    _: UserContext = Depends(require_role(Role.ADMIN)),
+):
+    from src.backend.ai.settings import save_ai_settings
+
+    save_ai_settings(
+        db,
+        provider=body.provider,
+        openrouter_key=body.openrouter_key or None,
+        nvapi_key=body.nvapi_key or None,
+    )
+    return {"status": "ok", "provider": body.provider}
+
+
+@router.get("/settings")
+async def get_ai_settings(
+    db: Session = Depends(get_db),
+    _: UserContext = Depends(require_role(Role.ADMIN)),
+):
+    from src.backend.shared_models import SystemSetting
+
+    rows = db.query(SystemSetting).filter(
+        SystemSetting.key.in_(["AI_PROVIDER", "OPENROUTER_API_KEY", "NVAPI_KEY"])
+    ).all()
+    return {row.key: "***set***" if row.value else None for row in rows}
 
 
 class RootCauseResponse(BaseModel):
