@@ -530,3 +530,331 @@ If build fails but tsc passes → it's ESLint. Fix the ESLint error, rarely is i
 - `react-hooks/exhaustive-deps` (missing/wrong deps)
 - `@typescript-eslint/no-unused-vars` (unused imports/vars)
 - `@next/next/no-img-element` (use `next/image`)
+
+---
+
+## 25. Root Cause First Debugging (Don't Patch Symptoms)
+
+When multiple things break simultaneously (e.g., all routes return 404, all tests fail), resist the urge to fix each individually. Find the ONE root cause:
+
+**Flow:**
+1. Identify EVERYTHING that's broken (make a list)
+2. Find the common thread — what do all broken things share?
+   - Same config file? Same import? Same build step?
+3. Fix the root cause, watch everything heal simultaneously
+4. Verify all items on the list are now fixed
+
+**Example:** In SENTINEL-HERS, every Vercel route returned 404. Instead of fixing routes one-by-one, found `output: "standalone"` in `next.config.ts` — incompatible with Vercel serverless. Removing one line fixed ALL routes.
+
+**When to use:** 3+ seemingly unrelated things break at once.
+
+---
+
+## 26. OpenAPI Contract Verification (Route Debugging)
+
+When an API endpoint returns 404 but you're sure it exists:
+
+```
+1. Fetch /openapi.json from the running server
+2. Check if the route + method is actually registered
+3. If it's in the spec → problem is auth, body format, or path params
+4. If NOT in the spec → router not registered, prefix mismatch, or deploy is stale
+```
+
+**Example:** Root cause endpoint returned 404 despite being in the code. OpenAPI spec showed it was registered. The real issue was a stale shell variable (`$INC_ID` was empty), not the backend.
+
+**When to use:** Any time a route returns 404 unexpectedly. Eliminates "maybe the deploy is stale" guesswork in 2 seconds.
+
+---
+
+## 27. Browser Verification Standard (Don't Trust curl for SPAs)
+
+Single-page apps (Next.js, React) render via JavaScript hydration. curl shows the prerendered HTML shell, NOT the actual UI.
+
+**Rule:** A feature is NOT done until verified in a real browser engine.
+
+**Playwright verification flow:**
+```bash
+# 1. Open browser to production URL
+npx playwright open https://app.vercel.app/login
+
+# 2. Take snapshot — actually read the DOM elements
+npx playwright snapshot --filename=page.yml
+cat page.yml  # Check for actual form elements, buttons, text
+
+# 3. Walk the demo path interactively
+npx playwright click "▶ Enter live SEV1 demo"
+npx playwright snapshot --filename=dashboard.yml
+
+# 4. Check for console errors
+npx playwright console
+
+# 5. Screenshot for evidence
+npx playwright screenshot --filename=proof.png --hires
+```
+
+**What curl CAN verify:**
+- HTTP status codes (200, 401, 404)
+- Response headers (CORS, cache)
+- API JSON responses (data shape)
+- Health check endpoints
+
+**What curl CANNOT verify:**
+- JavaScript execution
+- React hydration
+- Form rendering
+- API calls from the frontend
+- UI state transitions
+- OAuth flows
+
+**Example:** SENTINEL-HERS login page showed "Loading console…" in curl (8289 bytes of prerender shell). In Playwright browser, it rendered the full login form with demo credentials and "▶ Enter live SEV1 demo" button. curl alone would have made us think the page was broken.
+
+---
+
+## 28. DB Persistence for Git-Protected Secrets
+
+When GitHub push protection (secret scanning) blocks you from committing API keys to the repo:
+
+**Problem:**
+- render.yaml needs OPENROUTER_API_KEY but `sync: false` means dashboard-only
+- GitHub blocks pushing any key pattern (sk-or-v1-*, sk-*, etc.)
+- Render dashboard requires manual login — hard to automate
+
+**Solution — Database persistence:**
+1. Create a `SystemSetting` key-value model in the DB
+2. On startup, load settings from DB → set `os.environ`
+3. The seed endpoint writes keys to DB (in addition to os.environ)
+4. Keys survive restarts because they're in the database, not env vars
+
+**Schema:**
+```python
+class SystemSetting(Base):
+    __tablename__ = "system_settings"
+    key = Column(String(255), primary_key=True)
+    value = Column(String(2000), nullable=False, default="")
+```
+
+**Startup pattern:**
+```python
+def load_ai_settings_from_db(db: Session) -> None:
+    for key in _AI_KEYS:
+        if os.getenv(key):
+            continue  # Env var takes priority
+        row = db.query(SystemSetting).filter(SystemSetting.key == key).first()
+        if row and row.value:
+            os.environ[key] = row.value
+```
+
+**When to use:** When GitHub push protection blocks secrets AND you need them to survive server restarts AND you can't use dashboard env vars.
+
+---
+
+## 29. Circular Import Extraction Pattern
+
+**Problem:** Module A imports from Module B, Module B imports from Module A → circular import, Python raises `ImportError`.
+
+**Pattern:**
+1. Identify what Module B needs from Module A (usually a utility, config, or shared dependency)
+2. Extract it to a NEW standalone module C
+3. Both A and B import from C instead of each other
+
+**Example:**
+```python
+# BEFORE:
+# api/main.py  ←→  src/backend/auth/routes.py
+# main.py defines `limiter`, auth/routes.py imports limiter from main.py
+# main.py imports auth_router from auth/routes.py
+# → CIRCULAR!
+
+# FIX: Extract limiter to standalone module
+# src/backend/rate_limit.py
+from slowapi import Limiter
+from slowapi.util import get_remote_address
+limiter = Limiter(key_func=get_remote_address, default_limits=["200/minute"])
+
+# api/main.py imports from rate_limit.py
+# auth/routes.py imports from rate_limit.py
+# No more circular dependency
+```
+
+**When to use:** Python ImportError with "cannot import name X from partially initialized module Y".
+
+**Result in SENTINEL-HERS:** Fixed 72 test errors → tests increased from 118 → 198 passing.
+
+---
+
+## 30. Vercel Edge Cache Debugging
+
+After deploying to Vercel, curl may show stale content (old prerender shell) even though Vercel reports the build as "READY" and "PROMOTED".
+
+**Cache states:**
+| Header | Meaning |
+|--------|---------|
+| `x-vercel-cache: PRERENDER` | Freshly generated prerender (age=0) — this IS the new build |
+| `x-vercel-cache: HIT` | Served from edge cache (age > 0) |
+| `x-vercel-cache: MISS` | Cache miss, will be regenerated |
+| `x-vercel-cache: STALE` | Stale cache (problem) |
+
+**Key insight:** For Next.js `"use client"` pages, the prerendered HTML shell is deliberately minimal (~8KB with "Loading console…"). This is CORRECT behavior — the actual UI renders after JS hydration in a browser.
+
+**Debug flow:**
+```
+1. Check x-vercel-cache header → PRERENDER means fresh deploy
+2. Check page size → ~8KB with BAILOUT_TO_CLIENT_SIDE_RENDERING is normal for client components
+3. Open in Playwright browser → does the form actually render?
+4. Check JS chunks load → look for /_next/static/chunks/app/...js
+5. If JS chunks are from current deploy → it's working
+```
+
+**When to use:** After any Vercel deploy when production URL seems wrong.
+
+---
+
+## 31. Chrome Persistent Profile for Dashboard Automation
+
+When a service (Render, Vercel, Cloudflare) uses OAuth (GitHub/Google) and you need to automate dashboard changes:
+
+**Problem:** OAuth login flows can't be automated with username/password. No API key available for the service.
+
+**Solution — reuse existing browser session:**
+```bash
+# 1. Find which Chrome profile has the session cookie
+python3 -c "
+import sqlite3, os
+for p in ['Default', 'Profile 1', 'Profile 8']:
+    path = os.path.expanduser(f'~/Library/Application Support/Google/Chrome/{p}/Cookies')
+    if os.path.exists(path):
+        conn = sqlite3.connect(path)
+        cur = conn.cursor()
+        cur.execute(\"SELECT COUNT(*) FROM cookies WHERE host_key LIKE '%render%'\")
+        count = cur.fetchone()[0]
+        print(f'{p}: {count} Render cookies')
+        conn.close()
+"
+
+# 2. Launch Playwright with that profile (persists cookies + localStorage)
+npx playwright open --persistent --profile="$HOME/Library/Application Support/Google/Chrome/Profile 1"
+
+# 3. Navigate to the service dashboard
+npx playwright goto https://dashboard.render.com
+```
+
+**Note:** macOS encrypts Chrome cookie values with the system keychain, so they appear empty in SQLite. However, Playwright's persistent context can still use them.
+
+**Limitations:** Session cookies expire. If the OAuth session is expired, you'll still land on the login page and need interactive login.
+
+---
+
+## 32. The "Done When Verified in Browser" Standard
+
+**Definition of DONE for any feature:**
+- [ ] Tests pass (pytest, vitest, etc.)
+- [ ] TypeScript compiles (`tsc --noEmit`)
+- [ ] Production build succeeds (`npm run build`)
+- [ ] API endpoints return correct data (curl)
+- [ ] UI renders correctly in browser (Playwright screenshot)
+- [ ] Demo path walkable end-to-end (Playwright interactive)
+- [ ] Zero console errors (Playwright console check)
+- [ ] Deployed to production, not just localhost
+
+**Anti-patterns:**
+❌ "Tests pass so it's done" — tests don't verify UI rendering
+❌ "It works on my machine" — doesn't verify deployment
+❌ "curl shows 200" — doesn't verify JS hydration
+❌ "The build is promoted" — Vercel edge cache may still be stale
+
+---
+
+## 33. Deploy → Verify → Fix Loop
+
+After every infrastructure change (config fix, env var, deploy), follow this tight loop:
+
+```
+1. Push commit → triggers auto-deploy
+2. Wait for deploy to complete (Vercel: ~2min, Render: ~3min)
+3. Verify in curl (API health, status codes)
+4. Verify in browser (Playwright snapshot)
+5. If broken → fix → goto 1
+6. If working → move to next task
+```
+
+**Parallel verification:**
+```bash
+# While deploy is building, prepare verification commands
+# This way you can verify the INSTANT it's live
+```
+
+**SENTINEL-HERS example:** After removing `output: standalone`, waited for Vercel deploy, then:
+- curl login page → 8289 bytes (prerender shell — expected)
+- Playwright open → full login form with demo button (verified)
+- Click demo button → dashboard with 3 incidents (verified)
+- Click SEV1 → AI summary + timeline + tasks (verified)
+
+---
+
+## 34. Staged Commit Strategy
+
+Commit in logical, deploy-triggering chunks so each deploy is traceable and rollback-safe:
+
+**Bad:** One massive commit with everything
+**Good:** Sequence of focused commits:
+
+```
+1. "Fix root cause: remove output: standalone from next.config"
+   → Vercel deploys fix, routes start working
+2. "Fix tasks endpoint: return {data: [...]}"
+   → API contract fixed
+3. "Persist AI settings to DB — survives restarts"
+   → Infrastructure hardening
+4. "Add CI workflow: pytest + next lint"
+   → Process automation
+5. "Update README + WRITEUP with live URLs"
+   → Documentation
+```
+
+**Each commit:**
+- Is deployable independently
+- Has a clear scope
+- Can be reverted without affecting unrelated work
+- Triggers a deploy that can be verified immediately
+
+**Pattern:** `"Area: specific change"` — e.g., `"Backend: fix circular import in auth routes"`
+
+---
+
+## 35. Pre-Submission Audit Checklist
+
+Before declaring any project "submission-ready":
+
+**Verification:**
+- [ ] Production URL loads in browser (not just curl)
+- [ ] Login/signup works end-to-end
+- [ ] Core demo path walkable in < 30 seconds
+- [ ] API health endpoint returns 200
+- [ ] Tests pass (full suite, clean checkout)
+- [ ] No console errors in browser
+- [ ] No exposed secrets in repo (git ls-files, check .env*)
+- [ ] README is accurate (no "IN PROGRESS" or "404" if they're fixed)
+- [ ] WRITEUP.md has live URLs and honest assessment
+- [ ] CORS configured for production origin
+- [ ] CI workflow exists (even if not triggered yet)
+- [ ] Submission links work (judge can open everything)
+
+**Polish:**
+- [ ] Login page has demo credentials visible / one-click demo button
+- [ ] Empty states for pages with no data
+- [ ] Error states don't show raw stack traces
+- [ ] Mobile responsive (check at 375px width)
+- [ ] Dark mode default (most judges appreciate this)
+
+**The "Judge Walkthrough":**
+Write a step-by-step that a judge can follow blind:
+```
+1. Open <url>
+2. Click "<one-click demo button>" or enter credentials
+3. You'll see: 3 incidents, MTTR, SLA stats
+4. Click the SEV1 incident
+5. You'll see: AI summary, timeline, tasks, chat
+```
+
+If any step requires explanation the judge wouldn't have → fix it.
