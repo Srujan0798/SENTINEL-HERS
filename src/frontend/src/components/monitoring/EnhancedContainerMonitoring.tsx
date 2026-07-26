@@ -15,10 +15,19 @@ import {
   TrendingDown,
   RefreshCw,
   Zap,
-  HardDrive,
   MemoryStick
 } from "lucide-react";
-import { api, type Alert } from "@/lib/api";
+
+interface Alert {
+  id: string;
+  title?: string;
+  description?: string;
+  message: string;
+  severity: "low" | "medium" | "high" | "critical" | "warning" | "info";
+  timestamp: string;
+  created_at?: string;
+  container_id?: string;
+}
 
 interface ContainerMetrics {
   id: string;
@@ -110,16 +119,20 @@ export function EnhancedContainerMonitoring() {
       const mockAlerts: Alert[] = [
         {
           id: "alert-1",
+          message: "Database container CPU usage at 95%",
           title: "High CPU Usage",
           description: "Database container CPU usage at 95%",
           severity: "warning",
+          timestamp: "2024-01-17T10:30:00Z",
           created_at: "2024-01-17T10:30:00Z"
         },
         {
           id: "alert-2", 
+          message: "API Gateway memory usage at 75%",
           title: "Memory Pressure",
           description: "API Gateway memory usage at 75%",
           severity: "info",
+          timestamp: "2024-01-17T09:15:00Z",
           created_at: "2024-01-17T09:15:00Z"
         }
       ];
@@ -145,14 +158,7 @@ export function EnhancedContainerMonitoring() {
     }
   };
 
-  const getStatusColor = (status: string) => {
-    switch (status) {
-      case "running": return "text-green-500";
-      case "stopped": return "text-yellow-500";
-      case "error": return "text-red-500";
-      default: return "text-gray-500";
-    }
-  };
+
 
   const getHealthColor = (health: string) => {
     switch (health) {

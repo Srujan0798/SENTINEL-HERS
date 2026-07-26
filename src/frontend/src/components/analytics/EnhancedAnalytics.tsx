@@ -5,7 +5,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
 import { api, type Incident } from "@/lib/api";
-import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, PieChart, Pie, Cell, LineChart, Line } from "recharts";
+import { XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, PieChart, Pie, Cell, LineChart, Line } from "recharts";
 import { TrendingUp, AlertTriangle, Clock, Users } from "lucide-react";
 
 interface EnhancedAnalyticsProps {
@@ -35,8 +35,8 @@ export function EnhancedAnalytics({ teamId }: EnhancedAnalyticsProps) {
     const fetchIncidents = async () => {
       try {
         setLoading(true);
-        const response = await api.get(`/incidents?team_id=${teamId}&limit=100`);
-        setIncidents(response.data || []);
+        const response = await api.get<Incident[]>(`/incidents?team_id=${teamId}&limit=100`);
+        setIncidents(response || []);
       } catch (error) {
         console.error("Failed to fetch incidents:", error);
       } finally {

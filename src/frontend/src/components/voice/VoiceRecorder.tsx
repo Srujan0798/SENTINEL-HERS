@@ -512,19 +512,26 @@ function MicIcon({ active }: { active: boolean }) {
   );
 }
 
-function Waveform() {
+function Waveform({ audioLevel = 0 }: { audioLevel?: number }) {
   return (
     <div className="flex items-end gap-1 h-8">
-      {Array.from({ length: 12 }).map((_, i) => (
-        <div
-          key={i}
-          className="w-1 bg-[color:var(--sev1)] rounded-full animate-pulse"
-          style={{
-            height: `${8 + Math.random() * 20}px`,
-            animationDelay: `${i * 0.08}s`,
-          }}
-        />
-      ))}
+      {Array.from({ length: 12 }).map((_, i) => {
+        const height = 8 + Math.random() * 20;
+        const isActive = audioLevel > 30;
+        return (
+          <div
+            key={i}
+            className={`w-1 rounded-full transition-all duration-100 ${
+              isActive ? 'bg-[color:var(--sev1)]' : 'bg-gray-300'
+            }`}
+            style={{
+              height: `${height}px`,
+              animationDelay: `${i * 0.08}s`,
+              opacity: isActive ? 1 : 0.5,
+            }}
+          />
+        );
+      })}
     </div>
   );
 }
@@ -559,29 +566,7 @@ function ConfidenceSpinner() {
   );
 }
 
-function Waveform({ audioLevel = 0 }: { audioLevel?: number }) {
-  return (
-    <div className="flex items-end gap-1 h-8">
-      {Array.from({ length: 12 }).map((_, i) => {
-        const height = 8 + Math.random() * 20;
-        const isActive = audioLevel > 30;
-        return (
-          <div
-            key={i}
-            className={`w-1 rounded-full transition-all duration-100 ${
-              isActive ? 'bg-[color:var(--sev1)]' : 'bg-gray-300'
-            }`}
-            style={{
-              height: `${height}px`,
-              animationDelay: `${i * 0.08}s`,
-              opacity: isActive ? 1 : 0.5,
-            }}
-          />
-        );
-      })}
-    </div>
-  );
-}
+
 
 function TranscribingSpinner() {
   return (
