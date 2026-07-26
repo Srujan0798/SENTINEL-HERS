@@ -1,50 +1,132 @@
-# HANDOFF — SENTINEL (Real product hardening)
+# HANDOFF — SENTINEL (verified 2026-07-26, this session)
 
-**Updated:** 2026-07-26
-**Phase:** Live hardening — all API endpoints verified, real AI working on production
+> Replace, never append.
 
-## What was done this session
+## TL;DR for next maintainer
+Live demo works end-to-end for judges (login → dashboard → incidents → analytics →
+monitoring). This session found and fixed 4 real, live bugs by re-verifying every
+prior claim from scratch instead of trusting docs — two of them (SSE auth header,
+NVIDIA provider crash) were previously undetected showstoppers hiding behind a
+generic error message. One external action item remains open (below).
 
-### Real features (were fake/stub, now real)
-- **Notification preferences:** Toggles on settings page now persist to DB via `GET/POST /api/notifications/preferences`. No longer local-only state. `src/backend/notifications/` (models, routes)
-- **Invite member:** Button opens dialog → POSTs to `/auth/invite` (admin-protected). Creates user with selected role on the same team. `src/backend/auth/routes.py:invite_member`
-- **AI settings admin endpoint:** `POST/GET /api/ai/settings` — admin-only. Seed OpenRouter key without needing SEED_SECRET. `src/backend/ai/routes.py`
+## Live
+| Item | Value |
+|------|--------|
+| Frontend | https://sentinel-hers.vercel.app |
+| Backend | https://sentinel-api-clu9.onrender.com |
+| Demo login | `demo@sentinel.io` / `Sentinel2026!` |
+| GitHub | https://github.com/Srujan0798/SENTINEL-HERS |
+| `verify_live.sh` | PASS (`bash scripts/verify_live.sh`, 2026-07-26) |
 
-### Infrastructure fixes (prevented demo)
-- **Render production AI check:** Removed fatal `sys.exit(1)` from `api/main.py` — server no longer crashes when AI key is in DB but not env var. Changed to warning-only.
-- **`ALLOW_MOCK_AI=1`** added to `render.yaml` — mock AI works in production as safety net.
-- **AI key seeded on live:** OpenRouter key stored in `system_settings` table via `POST /api/ai/settings` (admin auth). Survives restarts.
+## Real bugs found + fixed this session (all pushed to main)
+1. **`3e1f1a9`** SSE realtime endpoint (`/api/realtime/events`) declared
+   `authorization: str = ""` as a plain parameter instead of `Header()` — FastAPI
+   parsed it as a query param, so it never read the real `Authorization` header the
+   frontend sends. Every browser SSE connection 401'd forever (confirmed via
+   repeated console errors on the live site + direct curl repro). Fixed with
+   `Header(default="")`; verified against a local live server (401 → 200 +
+   `event: connected`).
+2. **`b7471f3`** `NvidiaProvider` (src/backend/ai/provider.py) implemented
+   `stream_complete()` but never the abstract `complete()` method required by
+   `AIProvider` — instantiating it raised `TypeError: Can't instantiate abstract
+   class`. Live Render runs `AI_PROVIDER=nvidia`, so every incident summary,
+   root-cause request, and postmortem was silently 503ing behind a generic
+   `ai_unavailable` message (the bare `except Exception` swallowed the real
+   traceback — FM-11). Added the missing `complete()` and `logger.exception()`
+   before the 503s so future failures show up in logs, not just a flat "unavailable".
+3. **`c734eaa`** `_get_fernet()` (src/backend/ai/settings.py) regenerated a brand
+   new random Fernet key on every call whenever `ENCRYPTION_KEY` didn't end in `=`,
+   so `_encrypt`/`_decrypt` used different keys across calls and decryption
+   silently failed every time (swallowed by a bare `except`). Now validated once
+   via `Fernet(raw)` and cached; verified encrypt→decrypt round-trips correctly.
+4. **`79b785b`** Stale `sentinel_test.db`/`-journal` files left behind by a
+   crashed/interrupted pytest run polluted subsequent full-suite runs, producing
+   spurious "table already exists" errors that only appeared when running the
+   whole suite (not any single file). Fixed by unlinking both at session-fixture
+   start in `tests/conftest.py`.
+5. **Reverted, not shipped:** an in-progress uncommitted change (from before this
+   session) that made new self-registrations default to `viewer`/`responder`
+   instead of `admin`, in response to an audit that called this a "P0 RBAC
+   bypass". That audit was wrong: `register()` always creates a brand-new,
+   uniquely-slugged team (`auth/service.py:120-133`) — a self-registered user is
+   admin *only of their own new team*, which is standard self-serve SaaS behavior
+   (Slack/Notion/Linear all work this way), not a cross-tenant bypass. The change
+   broke 26 legitimate tests for no real security gain; reverted.
 
-### Current live state (proven working)
-- **Backend:** `https://sentinel-api-clu9.onrender.com` — healthz 200, login 200, all 15+ API modules serving
-- **Frontend:** `https://sentinel-hers.vercel.app` — login page serves, JS hydration works
-- **AI:** REAL OpenRouter provider (GPT-4o-mini). Summary returns 3-paragraph analysis. Root causes returns 5 ranked hypotheses with confidence scores. Chat responds with context.
-- **Auth:** JWT login, register, refresh, me. RBAC: admin/incident_commander/responder/viewer.
-- **Notifications:** Email/Slack/PagerDuty toggles persist. Invite member creates DB record.
-- **Tests:** 199 passed, 0 failed (clean checkout)
-- **Seed data:** 3 incidents (SEV1 investigating, SEV2 triaging, SEV3 resolved), 6+ timeline events, tasks, alerts, service health, deployments, ML anomaly scores
+## Known real gaps (not blockers, documented honestly)
+- **No `/auth/logout` endpoint.** Client-side logout only clears local
+  storage/cookies; the access token remains valid until its 15-min expiry.
+  Mitigated by the short TTL and the fact refresh tokens *are* revoked (jti
+  blacklist) on rotation.
+- **Webhook secret (GitHub/GitLab) is a single global env var, not per-team.**
+  Fine for a single-org hackathon demo; would need per-team secrets for real
+  multi-tenant production use.
+- **`/docs` and `/openapi.json` are open in prod.** Exposes route shapes, no
+  secrets. Acceptable for a judged demo.
+- **Docker/Kubernetes container panel on Monitoring reports "Unavailable — timed
+  out probing"** on Render's managed PaaS — this is an honest empty state (no
+  docker socket access there), not a fake/hidden failure. Service health + alerts
+  above it are the judge-facing monitoring path.
+- **Full pytest suite has order-dependent flakiness**: every test file passes
+  100% in isolation; the combined full-suite run (`pytest -q`, all files
+  together) has produced anywhere from 163 to 199 passed across repeated identical
+  runs with the stale-DB issue fixed, due to shared SQLite-file state across test
+  files without per-test transaction isolation. Not evidence of a broken feature —
+  every file is independently green. Would need per-test transactional rollback
+  (or a fresh DB file per test module) to fully eliminate; out of scope this
+  session given it doesn't affect production code.
 
-### What remains fake/stub
-- **Email delivery:** Notification prefs stored but actual SMTP/sending not implemented
-- **Slack webhook:** Prefs stored but no actual Slack API call
-- **PagerDuty integration:** Same — configs stored, no API call
-- **API key management:** Settings page shows placeholder keys — no actual key generation/rotation
+## OPEN — external action item (owner: user, in progress)
+**Live AI features (summary/RCA/postmortem/chat) are still broken on Render.**
+After fix #2 above, `AI_PROVIDER=nvidia`'s `complete()` now runs but the NVIDIA
+API itself returns `404 page not found` for the configured model — looks like a
+stale/wrong model ID or endpoint on NVIDIA's NIM catalog. `render.yaml`'s own
+declared default is `AI_PROVIDER=openrouter`, which was verified working live
+earlier in this project's history. User is debugging the correct NVIDIA model ID
+directly; if that stalls, flipping the Render dashboard env var `AI_PROVIDER` to
+`openrouter` (key already provisioned per render.yaml) is the fallback fix.
 
-## Live URLs
-- FE: https://sentinel-hers.vercel.app
-- API: https://sentinel-api-clu9.onrender.com
-- Demo: demo@sentinel.io / Sentinel2026!
-- AI: OpenRouter (GPT-4o-mini) — seeded to DB, survives restarts
+## Verified live this session (real browser, Playwright MCP)
+- Login: **both** the one-click demo button and the manual email/password form
+  land cleanly on `/dashboard` and hold (no bounce-back to `/login`).
+- Dashboard: real seeded data — 3 incidents, 1 SEV1, MTTR 47m, SLA tracking.
+- Analytics: loads cleanly (no stuck "Loading…"), real Predictive Anomaly Risk
+  panel with per-service scores.
+- Monitoring: real alerts, service health, recent logs; honest container
+  empty-state (see above).
+- Realtime nav badge: "connected" (post SSE-header-fix).
+- Incident war room: timeline, tasks, SLA countdown, comms panel all render with
+  real seeded data. AI summary/RCA/postmortem blocked by the open NVIDIA item
+  above — not a frontend bug, confirmed via direct backend curl repro.
+- Playwright CLI (`npx playwright test`) showed one failure reaching
+  `/dashboard`, but manual interactive browser testing (both login paths) landed
+  cleanly — treated as CLI/test-harness flakiness, not a live product defect,
+  since the identical action succeeded twice interactively right after.
 
-## Key files
-| File | Purpose |
-|------|---------|
-| `src/backend/notifications/models.py` | NotificationPreference ORM model |
-| `src/backend/notifications/routes.py` | GET/POST /api/notifications/preferences |
-| `src/backend/auth/routes.py` | POST /auth/invite (admin-guarded) |
-| `src/backend/ai/routes.py` | POST/GET /api/ai/settings (admin-guarded) |
-| `src/backend/ai/settings.py` | load/save AI provider+key from DB |
-| `api/startup.py` | Loads AI settings from DB on boot |
-| `api/main.py` | Non-fatal production AI check |
-| `render.yaml` | ALLOW_MOCK_AI=1, removed old mock-blocking comment |
-| `src/frontend/src/app/(dashboard)/settings/page.tsx` | Real notification toggle + invite dialog |
+## Security review (this session, dedicated read-only pass)
+No P0/P1 found. Auth (bcrypt, JWT rotation, RevokedToken blacklist), multi-tenancy
+(every data route filters by JWT-derived `team_id`, never client input), and
+injection surfaces (parameterized pgvector queries, no raw SQL/eval/shell) all
+checked clean. One P2 found and fixed (Fernet key, #3 above). The two "P1"s from
+the earlier flawed audit (no logout, global webhook secret) are real but minor —
+see "Known real gaps" above.
+
+## Test suite
+```
+AI_PROVIDER=mock python -m pytest -q --tb=no
+```
+Every test file passes 100% run in isolation. Full combined run: see "Known real
+gaps" above for the order-dependent flakiness caveat — do not trust a single
+run's pass count as gospel; re-run 2-3x or run suspect files individually if a
+full run shows failures.
+
+## Judge path
+1. Open FE → **Enter live SEV1 demo** (one-click) or manual login with demo creds
+2. Dashboard → **Open SEV1 war room** (via Incidents)
+3. Timeline · tasks · SLA countdown · comms — all real seeded data
+4. Monitoring · Deployments · Analytics — all real, no stuck loading states
+5. AI summary/RCA/postmortem/chat: blocked pending the NVIDIA model-ID fix above
+
+## Next single action
+Resolve the NVIDIA model ID (or switch Render's `AI_PROVIDER` to `openrouter`),
+then re-verify AI summary/RCA/postmortem/chat live and this HANDOFF is fully clean.

@@ -44,3 +44,4 @@ echo .playwright-cli
 .playwright-cli/
 .vercel
 .env*
+.playwright-mcp/

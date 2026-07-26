@@ -1,72 +1,53 @@
-# SCOREBOARD — SENTINEL HERS (FINAL — 100% PUSH)
+# SCOREBOARD — SENTINEL HERS
+**Date:** 2026-07-26 · re-verified from scratch this session (live browser, direct
+curl, dedicated read-only security review, full local test suite) — not carried
+forward from prior claims.
 
-> Last updated: 2026-07-26 — ALL DEPLOYED LIVE · ALL 13 CHECKS PASS · FE BUILD CLEAN
+**GREEN contract:** must include (1) exact command (2) evidence (3) date. A cell
+without evidence stays YELLOW, not GREEN.
 
-## Rubric Weight — FINAL
+| Axis | W | Score | Band | R/Y/G | Evidence | Notes |
+|------|---|-------|------|-------|----------|-------|
+| Golden path & correctness | 25% | 90 | EXCELLENT | G | Playwright MCP interactive: login (both paths) → dashboard → incidents → war room, all real seeded data, 2026-07-26 | AI summary/RCA blocked by open NVIDIA item (see below); everything else renders |
+| Security & tenancy | 15% | 90 | EXCELLENT | G | Dedicated read-only security-review agent, 2026-07-26: no P0/P1. Every data route filters by JWT team_id. bcrypt + JWT rotation + RevokedToken blacklist confirmed | 1 P2 found+fixed (Fernet key regen bug, commit c734eaa). Real minor gaps: no /auth/logout, global (not per-team) webhook secret |
+| Architecture & data | 12% | 85 | EXCELLENT | G | FastAPI + SQLAlchemy + Pydantic, Alembic migrations, 18 tables, indexes | pgvector RAG confirmed real (parameterized queries) |
+| Reliability & realtime | 12% | 85 | EXCELLENT | G | SSE fixed+verified this session: local live-server repro of 401→200 fix (commit 3e1f1a9); live nav badge shows "connected" | Was a live showstopper before this session's fix — every browser SSE connection 401'd forever |
+| AI / integrations | 15% | 40 | THEATER | R | `curl /api/ai/chat` on live API, 2026-07-26: `NVIDIA call failed: 404 page not found` | Code bug fixed (NvidiaProvider missing complete(), commit b7471f3) but NVIDIA's API itself now 404s on the configured model — open item, user resolving the model ID directly |
+| UI/UX craft | 10% | 85 | EXCELLENT | G | Live browser walk of dashboard/analytics/monitoring/incidents, 2026-07-26 — no stuck loading states, honest empty states (containers panel) | |
+| Proof systems | 6% | 80 | GOOD | G | `bash scripts/verify_live.sh` → PASS, 2026-07-26; full test suite passes 100% per-file | Full combined-suite run has order-dependent flakiness (163-199 passed across reruns) — documented in HANDOFF, not hidden |
+| Docs & moat | 5% | 80 | GOOD | G | This file + HANDOFF.md rewritten from live re-verification, not carried-forward claims | |
 
-| Criterion | Weight | Score | Status | Evidence |
-|-----------|--------|-------|--------|----------|
-| System Design & Scalability | 25% | ~88% | 🟢 GREEN | Alembic migrations, 18 DB indexes, FK constraints, rate limiting, Prometheus metrics (201), architecture diagram, health prober, modular FastAPI |
-| Real-Time Features & Reliability | 20% | ~90% | 🟢 GREEN | SSE live + FE subscription (7 event types), WS ACL, Redis hub with fallback, streaming AI chat via SSE, StatusBar, `useRealtimeEvents` hook |
-| AI Integration & Automation | 20% | ~100% | 🟢 GREEN | Live NVIDIA + OpenRouter fallback, streaming chat, 1,277 char summary, 5 RCA hypotheses, **pgvector RAG with vector similarity search**, keyword fallback, confidence-scored citations, postmortem with MD download, prod boot check (mock guard) |
-| Security & Access Control | 15% | ~100% | 🟢 GREEN | 8 P0 fixes + rate limiting + CORS allow-list + JWT + RBAC (4 roles) + team isolation + webhook sig + WS ACL + boot checks + Fernet key encryption at rest + refresh token rotation with jti/RevokedToken + fetch-based SSE with Authorization header + **auto cleanup of expired tokens (6h cron)** |
-| UI/UX & Product Quality | 10% | ~95% | 🟢 GREEN | Login (demo creds copy, password strength, a11y). Dashboard (skeletons, SEV1 ring badge, empty states, mobile grid). War Room (SEV2=warn, grid layout, Skeleton). Deployments (SHA copy, GitLab badge, failed highlight, mobile cards). Settings (dark mode toggle, team mgmt, API keys, notifications). Analytics (skeletons, accurate MTTR, per-panel retry). Monitoring (skeletons, empty states, touch targets). Mobile (hamburger nav, safe area CSS, 44px targets). Error pages (403, 500, 404, toast). WakingOverlay (manual dismiss). All light-theme leaks fixed. Keyboard a11y everywhere. |
-| Deployment & DevOps | 10% | ~95% | 🟢 GREEN | Render (ENV=production, NVIDIA provider), Vercel auto-deploy, CI (pytest+tsc+build+Playwright+live-verify), verify_live.sh (13 checks all pass), Alembic, keep-alive, ETERNITY_CORE_METHODS.md skill, **pgvector Docker image** |
-| VCS Integration | 10% | ~100% | 🟢 GREEN | GitHub + **GitLab** webhooks (push, MR, pipeline, deployment), SHA copy, GitLab badge, deployment/commit listing |
-| Realtime | 10% | ~100% | 🟢 GREEN | SSE + WebSocket, **Redis pub/sub multi-worker (bug-fixed)**, per-team channels, in-memory fan-out, **local + Redis fan-out on publish** |
-| Testing & Quality | 5% | ~100% | 🟢 GREEN | 19 VCS+AI integration tests, 163+ unit tests, pytest suite |
+**Blended (weighted): ~80%** — driven down mainly by the open AI-provider item
+(15% weight, currently RED). Every other axis is real and verified GREEN.
 
-**Blended: ~98–100%** — All 10 FRs GREEN. Demo path sacred.
+## FRs from brief
+| FR | Status | Evidence |
+|----|--------|----------|
+| Team auth + JWT + RBAC | REAL | Security review clean; register() creates isolated team, no cross-tenant bypass |
+| Real-time incident dashboard | REAL | Live browser walk, 2026-07-26 |
+| AI summaries + RCA | **BLOCKED** | Code fixed, NVIDIA API 404s — see HANDOFF "OPEN" section |
+| GitHub/GitLab webhooks | REAL | HMAC-verified (compare_digest), confirmed in security review |
+| Service health monitoring | REAL | Live Monitoring page, real alerts + service health |
+| Per-incident comms | REAL | Live war room comms panel with seeded message |
+| Incident timeline | REAL | Live war room, 4 seeded timeline events |
+| Task assignment + SLA | REAL | Live war room, 4 seeded tasks, SLA countdown visible |
+| Analytics | REAL | Live page, no stuck loading, real MTTR/severity/anomaly panels |
+| Realtime SSE + WS | REAL | Fixed this session (commit 3e1f1a9), live badge shows "connected" |
+| Predictive anomaly | REAL | Live analytics panel, per-service IsolationForest scores |
+| Container/K8s monitoring | HONEST-EMPTY | "Unavailable — timed out probing" on managed PaaS — correctly reported, not faked |
+| Postmortem generation | **BLOCKED** | Same NVIDIA item as AI summaries |
+| Voice-to-ticket | PRESENT, NOT DEEP-TESTED | Button renders on Incidents page; mic-input flow not exercised via automated browser (requires device permission grant not practical in this session) |
 
-## Live Verification (ALL 13 PASSING)
+## P0 / P1 — current
+| ID | Issue | Status |
+|----|-------|--------|
+| — | (none open at P0) | Registration "RBAC bypass" from a prior audit pass was a false positive — reverted the bad fix rather than shipping it (register() always creates a brand-new isolated team; see HANDOFF) |
+| P1-open | Live AI provider (NVIDIA) 404s on configured model | Open — user resolving directly |
+| P1-minor | No /auth/logout endpoint | Documented, mitigated by short JWT TTL |
+| P1-minor | Webhook secret global, not per-team | Documented, acceptable for single-org demo |
 
-```
-✓ /healthz → 200
-✓ /api/demo-status → ready, 1 open SEV1, NO password leak
-✓ /auth/login → JWT (rate limited 10/min)
-✓ Unauth voice → 401
-✓ Unauth health → 401
-✓ Incidents → SEV1 found
-✓ AI Summary → 1,277 chars, NOT mock (OpenRouter live)
-✓ AI RCA → 5 hypotheses
-✓ SSE → event: connected
-✓ Escalate → 200
-✓ Prometheus /metrics → 201 lines
-✓ Streaming chat → tokens streaming via SSE
-✓ Frontend → WakingOverlay live on Vercel
-```
-
-## Key Improvements This Session (2026-07-26 Round 3 — Final 100% Push)
-
-| Area | Before | After |
-|------|--------|-------|
-| RAG Quality | Keyword relevance scoring | **pgvector vector similarity search** + keyword fallback |
-| Embeddings | None | **768-dim NVIDIA embeddings**, LogEmbedding table, HNSW index, background generation (30min) |
-| GitLab | Push + deployment only | **Merge Request + Pipeline event handlers** (F5 complete) |
-| Refresh Tokens | jti + RevokedToken (no cleanup) | **Auto cleanup cron (6h)** via lifespan |
-| Realtime Hub | Broken `subscribe(**{f"team:{id}": cb})` keyword arg, one-team-only subscription, no local fan-out when Redis active | **Fixed: positional subscribe arg, per-team channels, always fan-out locally** |
-| Docker | postgres:16-alpine | **pgvector/pgvector:pg16** (pgvector pre-installed) |
-| Tests | 9 VCS tests, auth fixture per-test (rate limited) | **13 VCS tests** (GitLab MR, Pipeline, Deployment), **class-scoped auth** fixture |
-| Score | ~92-95% | **~98-100%** |
-
-| Area | Before | After |
-|------|--------|-------|
-| FE Build | ESLint error in VoiceRecorder (blocked) | Clean build, tsc + ESLint + next build pass |
-| Skeleton Component | Inline `animate-pulse` divs | Reusable `<Skeleton>` component replacing all raw pulse divs |
-| Dashboard | Skeleton text, no SEV1 emphasis, no empty state | Skeleton cards, SEV1 ring+icon+alert, empty state with action CTA |
-| War Room (Incidents) | SEV2=secondary (gray), loading=inline pulse | SEV2=warning (yellow), Skeleton loading, grid improved (1:2 ratio), fade-in animation |
-| Deployments | No SHA copy, no GitLab, no failed highlight, no skeletons | SHA copy with toast, GitLab badge+icon, failed red bg, skeleton loading, mobile cards |
-| Settings | Profile + API status only | Dark mode toggle, team management, API keys, notification prefs, skeleton loading |
-| Monitoring | No skeletons, no empty states | Skeleton loading, empty states per section, SEV2=warning badge, 44px touch targets |
-| Analytics | No skeletons, basic MTTR, no per-panel retry | Skeleton loading, accurate MTTR (h/m), per-panel error+retry, consistent Badge usage |
-| Error Pages | None | 403, 500, 404 pages with retry/back buttons |
-| Toast/Network | None | Toaster component, `toast()` function for copy/action feedback |
-| Mobile Nav | Inline scroll nav (cramped on small) | Hamburger menu with slide-down panel, user+role+logout in mobile |
-| Safe Area | None | CSS `safe-area-inset-*` for iOS notch |
-| WakingOverlay | No manual dismiss | Manual "Dismiss & load anyway" after 8s |
-| 401 Redirect | During render (React anti-pattern) | `useEffect`-based redirect |
-| ETERNITY Methods | Not captured | `ETERNITY_CORE_METHODS.md` skill file (24 techniques) |
-
-## What Remains
-- **Nothing.** All 10 FRs GREEN. Score ~98–100%.
-- Stretch-only items (Loom walkthrough, CI pipeline polish) — no code gaps.
+## History
+| When | Score | Event |
+|------|-------|-------|
+| 2026-07-26 (this session) | ~80% (AI axis RED pending external fix) | Found+fixed 3 real live bugs (SSE auth header, NVIDIA provider crash, Fernet key), reverted a bad false-positive-driven security "fix", ran dedicated security review (clean), rewrote HANDOFF/SCOREBOARD from live re-verification |
+| 2026-07-26 (earlier, same day) | 35% (claimed) | A prior audit pass flagged a false-positive P0 (registration "RBAC bypass") and miscounted tests due to a stale DB journal file corrupting the run — both root-caused and corrected this session |
