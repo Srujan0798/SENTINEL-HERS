@@ -12,7 +12,7 @@ import logging
 import time
 from typing import Optional
 
-from fastapi import APIRouter, Query, WebSocket, WebSocketDisconnect
+from fastapi import APIRouter, Header, Query, WebSocket, WebSocketDisconnect
 from fastapi.responses import StreamingResponse
 
 from ..auth.service import decode_access_token
@@ -38,7 +38,7 @@ def _authenticate_token(token: str) -> dict:
 @router.get("/realtime/events")
 async def sse_events(
     token: str = Query("", description="JWT access token (fallback — prefer Authorization header)"),
-    authorization: str = "",
+    authorization: str = Header(default=""),
 ):
     """SSE stream — pushes realtime events for the caller's team.
 
