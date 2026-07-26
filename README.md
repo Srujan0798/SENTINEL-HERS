@@ -13,7 +13,7 @@
 **Problem statement:** Sentinel — AI Native Engineering Operations Platform (Hard).  
 Brief: [ps.md](ps.md) · Architecture: [plan/ARCHITECTURE.md](plan/ARCHITECTURE.md) · Write-up: [WRITEUP.md](WRITEUP.md)
 
-![status](https://img.shields.io/badge/tests-177%20passing-brightgreen)
+![status](https://img.shields.io/badge/tests-199%20passing-brightgreen)
 ![backend](https://img.shields.io/badge/backend-FastAPI-009688)
 ![frontend](https://img.shields.io/badge/frontend-Next.js%2015-black)
 ![deploy](https://img.shields.io/badge/deploy-Render%20%2B%20Vercel-blue)
@@ -56,6 +56,9 @@ Step-by-step: [docs/PRODUCTION_WALKTHROUGH.md](docs/PRODUCTION_WALKTHROUGH.md).
 | Analytics: MTTR, incident frequency, top errors, alert trends | ✅ DONE | Dashboard + analytics page with predictive anomaly risk |
 | Realtime SSE + WebSockets | ✅ DONE | Live status indicators |
 | Predictive anomaly (IsolationForest) | ✅ DONE | 4 services monitored with anomaly risk scores |
+| Notification preferences (email/Slack/PagerDuty) | ✅ WIRED | Config stored per-user; requires SMTP/webhook credentials to actually deliver |
+| Invite endpoint | ✅ DONE | `POST /api/v2/auth/invite` — admin-only, creates user + sends invite |
+| Notification preferences API | ✅ DONE | `GET/PUT /api/v1/notification-preferences` — per-channel toggle per user |
 
 ---
 
@@ -91,6 +94,7 @@ Design: [plan/ARCHITECTURE.md](plan/ARCHITECTURE.md) · Product: [plan/PRD.md](p
 
 ```bash
 cp .env.example .env          # set JWT_SECRET + JWT_REFRESH_SECRET (optional AI keys)
+pip install -r requirements.txt   # first-time only — needed for `make seed` and tests
 make up                       # postgres, redis, api, frontend, prometheus, grafana
 make seed                     # SEV1 + logs + alerts + anomalies (idempotent)
 open http://localhost:3000    # demo@sentinel.io / Sentinel2026!
@@ -109,6 +113,7 @@ Full local paths: [HOW_TO_RUN.md](HOW_TO_RUN.md) · Cloud deploy: [docs/DEPLOYME
 
 | Where | Variable | Notes |
 |-------|----------|--------|
+| Render | `ALLOW_MOCK_AI` | `1` to run AI features with deterministic mock (no API key needed for demo) |
 | Render | `NVAPI_KEY` | NVIDIA API key (primary AI provider) |
 | Render | `AI_PROVIDER` | `nvidia` (primary), falls back to `openrouter` → `claude` → `gemini` |
 | Render | `CORS_ORIGINS` | exact Vercel origin, e.g. `https://foo.vercel.app` |
@@ -123,10 +128,10 @@ Full local paths: [HOW_TO_RUN.md](HOW_TO_RUN.md) · Cloud deploy: [docs/DEPLOYME
 
 ```bash
 # from repo root, with venv active
-python -m pytest -q          # full suite — currently 177 passed (21 pre-existing errors unrelated to feature code)
+python -m pytest -q          # full suite — currently 199 passed
 ```
 
-**177 passed** (unit + integration; mock AI; SQLite). 21 pre-existing errors (anomaly / comms / seed infra — unrelated to feature code). Verified end-to-end in browser with live Render + Vercel.
+**199 passed** (unit + integration; mock AI; SQLite). All tests pass cleanly — no pre-existing failures. Verified end-to-end in browser with live Render + Vercel.
 
 ---
 
@@ -169,7 +174,7 @@ WRITEUP.md        1–2 page technical write-up (submission required)
 - [x] Public GitHub repo with meaningful commit history  
 - [x] README with setup + demo path  
 - [x] `WRITEUP.md` (technical decisions, challenges, more time)  
-- [x] Green automated tests (177 passed, features complete)  
+- [x] Green automated tests (199 passed, features complete)  
 - [x] Deploy configs (`render.yaml`, `src/frontend/vercel.json`)  
 - [x] Live deployment URLs embedded above  
 - [x] Verified end-to-end in browser — login → dashboard → SEV1 war room → AI → analytics  

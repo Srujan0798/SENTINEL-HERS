@@ -115,7 +115,13 @@ export default function SettingsPage() {
   const [inviting, setInviting] = useState(false);
 
   // API keys
-  const [apiKey] = useState("sk-" + "•".repeat(40));
+  const [apiKeys, setApiKeys] = useState<{ id: string; name: string; prefix: string; permissions: string }[]>([]);
+  const [newKeyName, setNewKeyName] = useState("");
+  const [newKeyPerm, setNewKeyPerm] = useState("read");
+  const [createdKey, setCreatedKey] = useState<string | null>(null);
+
+  // Notification channel configs
+  const [channels, setChannels] = useState<{ channel: string; configured: boolean; hint: string }[]>([]);
 
   useEffect(() => {
     const stored = localStorage.getItem("sentinel-theme");
@@ -168,6 +174,36 @@ export default function SettingsPage() {
     } finally {
       setNotifLoaded(true);
     }
+    try {
+      const keysRes = await fetch(`${API_BASE}/api/keys`, {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      if (keysRes.ok) setApiKeys(await keysRes.json());
+    } catch { /* non-critical */ }
+    try {
+      const chRes = await fetch(`${API_BASE}/api/notifications/channels`, {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      if (chRes.ok) setChannels(await chRes.json());
+    } catch { /* non-critical */ }
+  }
+
+  async function handleCreateKey() {
+    if (!newKeyName) return;
+    setCreatedKey(null);
+    try {
+      const res = await fetch(`${API_BASE}/api/keys`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
+        body: JSON.stringify({ name: newKeyName, permissions: newKeyPerm }),
+      });
+      if (res.ok) {
+        const data = await res.json();
+        setCreatedKey(data.key);
+        setApiKeys((prev) => [...prev, { id: data.id, name: data.name, prefix: data.prefix, permissions: data.permissions }]);
+        setNewKeyName("");
+      }
+    } catch { /* non-critical */ }
   }
 
   async function handleInvite() {
@@ -376,28 +412,31 @@ export default function SettingsPage() {
           </CardTitle>
         </CardHeader>
         <CardContent className="space-y-3 text-sm">
-          <div className="flex justify-between gap-4 items-center">
-            <span className="text-muted-foreground">Production key</span>
-            <div className="flex items-center gap-2">
-              <code className="text-xs font-mono tracking-wider select-all">{apiKey.slice(0, 12)}••••••••••••••••</code>
-              <Badge variant="secondary" className="text-[10px]">read / write</Badge>
+          {apiKeys.length === 0 && (
+            <p className="text-muted-foreground text-xs">No API keys created yet.</p>
+          )}
+          {apiKeys.map((k) => (
+            <div key={k.id} className="flex justify-between gap-4 items-center">
+              <span className="text-muted-foreground">{k.name}</span>
+              <div className="flex items-center gap-2">
+                <code className="text-xs font-mono tracking-wider select-all">{k.prefix}••••••••••••••••</code>
+                <Badge variant="secondary" className="text-[10px]">{k.permissions === "read_write" ? "read / write" : "read only"}</Badge>
+              </div>
             </div>
-          </div>
-          <div className="flex justify-between gap-4 items-center">
-            <span className="text-muted-foreground">Read-only key</span>
-            <div className="flex items-center gap-2">
-              <code className="text-xs font-mono tracking-wider select-all">sor••••••••••••••••••••••••</code>
-              <Badge variant="secondary" className="text-[10px]">read only</Badge>
+          ))}
+          {createdKey && (
+            <div className="bg-amber-50 dark:bg-amber-950 border border-amber-200 dark:border-amber-800 rounded p-2 text-xs">
+              <p className="font-medium mb-1">Key created — copy it now, it won't be shown again:</p>
+              <code className="break-all select-all font-mono">{createdKey}</code>
             </div>
-          </div>
-          <div className="pt-2">
-            <p className="text-muted-foreground text-xs">
-              Manage API keys in the{" "}
-              <span className="font-medium text-foreground cursor-pointer hover:underline">
-                Developer Console
-              </span>
-              . Keys inherit your team permissions and can be rotated at any time.
-            </p>
+          )}
+          <div className="pt-2 flex gap-2">
+            <input className="flex h-8 w-full rounded-md border border-input bg-transparent px-3 py-1 text-xs shadow-sm" placeholder="Key name" value={newKeyName} onChange={(e) => setNewKeyName(e.target.value)} />
+            <select className="flex h-8 rounded-md border border-input bg-transparent px-2 text-xs" value={newKeyPerm} onChange={(e) => setNewKeyPerm(e.target.value)}>
+              <option value="read">Read-only</option>
+              <option value="read_write">Read/Write</option>
+            </select>
+            <Button size="sm" variant="outline" onClick={handleCreateKey} disabled={!newKeyName}>Generate</Button>
           </div>
         </CardContent>
       </Card>
@@ -428,6 +467,33 @@ export default function SettingsPage() {
             <Bell className="h-3.5 w-3.5 text-muted-foreground" />
             <span className="text-xs text-muted-foreground">SEV1 / SEV2 only</span>
           </div>
+        </CardContent>
+      </Card>
+
+      {/* Notification Channel Config */}
+      <Card>
+        <CardHeader>
+          <CardTitle className="text-base flex items-center gap-2">
+            <Bell className="h-4 w-4" />
+            Notification Channel Setup
+          </CardTitle>
+        </CardHeader>
+        <CardContent className="space-y-3 text-sm">
+          {channels.map((ch) => (
+            <div key={ch.channel} className="flex justify-between items-center gap-4">
+              <div>
+                <span className="capitalize font-medium">{ch.channel}</span>
+                <p className="text-xs text-muted-foreground">{ch.hint}</p>
+              </div>
+              <Badge variant={ch.configured ? "default" : "secondary"}>
+                {ch.configured ? "configured" : "not set"}
+              </Badge>
+            </div>
+          ))}
+          <p className="text-xs text-muted-foreground pt-2">
+            Configure delivery credentials via{" "}
+            <code className="text-xs">POST /api/notifications/channels/email|slack|pagerduty</code> (admin required).
+          </p>
         </CardContent>
       </Card>
 

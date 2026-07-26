@@ -204,6 +204,9 @@ app.include_router(voice_router)
 from src.backend.seed.routes import router as seed_router
 app.include_router(seed_router)
 
+from src.backend.apikeys.routes import router as apikeys_router
+app.include_router(apikeys_router)
+
 from src.backend.notifications.routes import router as notifications_router
 app.include_router(notifications_router)
 

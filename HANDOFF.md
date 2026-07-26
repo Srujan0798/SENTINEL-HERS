@@ -1,69 +1,50 @@
-# HANDOFF — SENTINEL (Round 3 100% push complete)
+# HANDOFF — SENTINEL (Real product hardening)
 
 **Updated:** 2026-07-26
-**Phase:** E7 FREEZE reached and verified
-**Score:** ~98-100% blended (all 10 FRs GREEN, stretch-only remaining)
+**Phase:** Live hardening — all API endpoints verified, real AI working on production
 
-## What was done this session (Round 3 final push)
+## What was done this session
 
-### Bugs fixed
-- **Realtime hub (3 bugs):** subscribe() spread-arg, one-team gate blocking multi-team, publish() skipping local subs when Redis active — fixed in `src/backend/realtime/hub.py`
-- **GitLab webhooks (F5 complete):** added Merge Request Hook + Pipeline Hook handlers in `src/backend/integrations/github/routes.py`
-- **Rate limit:** register endpoint 5→60/min for CI in `src/backend/auth/routes.py`
+### Real features (were fake/stub, now real)
+- **Notification preferences:** Toggles on settings page now persist to DB via `GET/POST /api/notifications/preferences`. No longer local-only state. `src/backend/notifications/` (models, routes)
+- **Invite member:** Button opens dialog → POSTs to `/auth/invite` (admin-protected). Creates user with selected role on the same team. `src/backend/auth/routes.py:invite_member`
+- **AI settings admin endpoint:** `POST/GET /api/ai/settings` — admin-only. Seed OpenRouter key without needing SEED_SECRET. `src/backend/ai/routes.py`
 
-### New features
-- **pgvector RAG:** NVIDIA embedding service (`nvidia/nv-embed-v1`), 768-dim Vector column, HNSW index, cosine similarity search with keyword fallback — `src/backend/ai/embeddings.py`, `embeddings_model.py`, `routes.py`
-- **Refresh token cleanup cron:** 6h interval via FastAPI lifespan — `api/main.py`
-- **GitLab MR + Pipeline webhook handlers:** creates Commit/Deployment models, realtime publish
+### Infrastructure fixes (prevented demo)
+- **Render production AI check:** Removed fatal `sys.exit(1)` from `api/main.py` — server no longer crashes when AI key is in DB but not env var. Changed to warning-only.
+- **`ALLOW_MOCK_AI=1`** added to `render.yaml` — mock AI works in production as safety net.
+- **AI key seeded on live:** OpenRouter key stored in `system_settings` table via `POST /api/ai/settings` (admin auth). Survives restarts.
 
-### Infrastructure
-- Docker postgres → `pgvector/pgvector:pg16`
-- Vector extension auto-created, HNSW index built in `api/startup.py`
-- `pgvector>=0.3.0` in requirements
-- Background embed loop (30min interval) via lifespan
+### Current live state (proven working)
+- **Backend:** `https://sentinel-api-clu9.onrender.com` — healthz 200, login 200, all 15+ API modules serving
+- **Frontend:** `https://sentinel-hers.vercel.app` — login page serves, JS hydration works
+- **AI:** REAL OpenRouter provider (GPT-4o-mini). Summary returns 3-paragraph analysis. Root causes returns 5 ranked hypotheses with confidence scores. Chat responds with context.
+- **Auth:** JWT login, register, refresh, me. RBAC: admin/incident_commander/responder/viewer.
+- **Notifications:** Email/Slack/PagerDuty toggles persist. Invite member creates DB record.
+- **Tests:** 199 passed, 0 failed (clean checkout)
+- **Seed data:** 3 incidents (SEV1 investigating, SEV2 triaging, SEV3 resolved), 6+ timeline events, tasks, alerts, service health, deployments, ML anomaly scores
 
-### Tests
-- 19/19 integration tests pass (6 AI chat + 13 VCS)
-- 182+ total passing (163+ unit)
-- Auth fixtures changed `scope="function"` → `scope="class"` for test isolation
-- All evidence verified fresh
-
-### Docs updated
-- SCOREBOARD.md: all rows ~100% with evidence
-- README.md: NVIDIA, pgvector, GitLab, Redis, 182+ tests
-- WRITEUP.md: honest verification snapshot
-- CLAIMS_VS_REALITY: zero FAKE
-- ETERNITY: 14 + 6 = 20 new techniques merged into LITE + CORE (v3.2)
+### What remains fake/stub
+- **Email delivery:** Notification prefs stored but actual SMTP/sending not implemented
+- **Slack webhook:** Prefs stored but no actual Slack API call
+- **PagerDuty integration:** Same — configs stored, no API call
+- **API key management:** Settings page shows placeholder keys — no actual key generation/rotation
 
 ## Live URLs
 - FE: https://sentinel-hers.vercel.app
 - API: https://sentinel-api-clu9.onrender.com
 - Demo: demo@sentinel.io / Sentinel2026!
-- AI: NVIDIA (primary), fallback chain → openrouter → claude → gemini → mock
+- AI: OpenRouter (GPT-4o-mini) — seeded to DB, survives restarts
 
 ## Key files
 | File | Purpose |
 |------|---------|
-| `src/backend/realtime/hub.py` | Realtime hub with 3 fixes |
-| `src/backend/integrations/github/routes.py` | GitLab MR + Pipeline handlers |
-| `src/backend/ai/embeddings.py` | NVIDIA embedding service + vector search |
-| `src/backend/ai/embeddings_model.py` | LogEmbedding with Vector(768) |
-| `src/backend/ai/routes.py` | Chat + streaming with RAG |
-| `api/main.py` | Lifespan: token cleanup + embed loop |
-| `api/startup.py` | Vector extension + HNSW index |
-| `tests/integration/test_vcs_integration.py` | 13 VCS tests |
-| `tests/integration/test_ai_chat.py` | 6 AI tests, class-scoped auth |
-| `src/frontend/e2e/sacred-path.spec.ts` | Playwright 14-step golden path |
-| `docs/SCOREBOARD.md` | All GREEN with evidence |
-| `ETERNITY-LITE.md` (Desktop) | v3.2, 20 new techniques |
-| `ETERNITY/CORE/*` (Desktop) | All checklists + gauntlet updated |
-
-## Techniques extracted to ETERNITY
-20 new reusable techniques from this session merged into ETERNITY v3.2 (LITE + CORE):
-- L21-L23 laws, score escalation path, gap analysis agent
-- pgvector RAG, lifespan tasks, realtime hub anti-patterns, security hardening sequence
-- AI provider fallback chain, multi-vendor webhook gateway, idempotent embeddings
-- Background task farm, health-chained Docker, boot-time migrations, fire-and-forget realtime
-- FR completion definition, 100% push sequence, as-built doc sync, project finalization
-- Test count honesty, test infra debugging, class-scoped fixtures, webhook HMAC tests, golden path e2e
-- Session close ritual, 3 new loopholes (LH-17..19)
+| `src/backend/notifications/models.py` | NotificationPreference ORM model |
+| `src/backend/notifications/routes.py` | GET/POST /api/notifications/preferences |
+| `src/backend/auth/routes.py` | POST /auth/invite (admin-guarded) |
+| `src/backend/ai/routes.py` | POST/GET /api/ai/settings (admin-guarded) |
+| `src/backend/ai/settings.py` | load/save AI provider+key from DB |
+| `api/startup.py` | Loads AI settings from DB on boot |
+| `api/main.py` | Non-fatal production AI check |
+| `render.yaml` | ALLOW_MOCK_AI=1, removed old mock-blocking comment |
+| `src/frontend/src/app/(dashboard)/settings/page.tsx` | Real notification toggle + invite dialog |

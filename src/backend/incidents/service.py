@@ -64,6 +64,21 @@ def _publish_event(team_id: str, event_type: str, payload: dict[str, Any]) -> No
         pass
 
 
+def _try_dispatch_notifications(
+    db: Session,
+    channel: str,
+    recipient: str,
+    subject: str,
+    message: str,
+    incident_id: str | None = None,
+) -> None:
+    try:
+        from src.backend.notifications.service import dispatch_notification
+        dispatch_notification(db, channel, recipient, subject, message, incident_id)
+    except Exception:
+        pass
+
+
 def _emit_timeline_event(
     db: Session,
     incident_id: str,
@@ -121,6 +136,9 @@ class IncidentService:
             description=f"Incident created with severity {severity.value}",
         )
         _publish_event(str(team_id), "incident.create", {"incident_id": inc.id, "severity": severity.value, "status": IncidentStatus.DETECTED.value})
+        _try_dispatch_notifications(self.db, "slack", "#incidents", f"[{severity.value}] {title}", description or "", inc.id)
+        if severity in (SeverityLevel.SEV1, SeverityLevel.SEV2):
+            _try_dispatch_notifications(self.db, "pagerduty", "", f"[{severity.value}] {title}", description or "", inc.id)
         self.db.commit()
         self.db.refresh(inc)
         return _serialize_incident(inc)
@@ -265,6 +283,7 @@ class IncidentService:
             metadata={"escalated_to": str(escalate_to), "reason": reason},
         )
         _publish_event(str(team_id), "incident.escalate", {"incident_id": inc.id, "escalated_to": str(escalate_to), "reason": reason})
+        _try_dispatch_notifications(self.db, "slack", "#incidents", f"[ESCALATED] {inc.title}", reason or f"Escalated to {escalate_to}", inc.id)
         self.db.flush()
         self.db.commit()
         self.db.refresh(inc)
