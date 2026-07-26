@@ -2,7 +2,7 @@ from fastapi import APIRouter, Depends, Request, status
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 from sqlalchemy.orm import Session
 
-from api.main import limiter
+from src.backend.rate_limit import limiter
 from src.backend.db import get_db
 from .models import LoginRequest, RefreshRequest, RegisterRequest, TokenResponse, UserResponse
 from .service import (
