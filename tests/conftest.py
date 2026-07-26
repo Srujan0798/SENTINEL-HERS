@@ -57,6 +57,11 @@ def create_test_tables():
     from src.backend.db import Base
     _import_orm_models()
     db_path = "sentinel_test.db"
+    # FM-02: a stale DB/journal left behind by a previous crashed/interrupted
+    # test session can corrupt or pollute state for this run (e.g. leftover
+    # rows, half-written journal). Always start from a clean slate.
+    Path(db_path).unlink(missing_ok=True)
+    Path(f"{db_path}-journal").unlink(missing_ok=True)
     engine = create_engine(
         f"sqlite:///./{db_path}",
         connect_args={"check_same_thread": False},
