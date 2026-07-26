@@ -42,6 +42,14 @@ def run_migrations() -> None:
 
     logger.info("DB migrations complete — %d tables", len(Base.metadata.tables))
 
+    # Restore AI provider settings from DB (survives restarts).
+    try:
+        with Session(engine) as session:
+            from src.backend.ai.settings import load_ai_settings_from_db
+            load_ai_settings_from_db(session)
+    except Exception:
+        logger.exception("AI settings restore failed (non-fatal)")
+
     # Ensure judge demo path exists after every boot (idempotent).
     try:
         from src.backend.seed.service import auto_seed_if_enabled

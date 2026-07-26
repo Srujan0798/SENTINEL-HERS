@@ -45,6 +45,14 @@ class RoleModel(Base):
     created_at = Column(DateTime(timezone=True), nullable=True)
 
 
+class SystemSetting(Base):
+    __tablename__ = "system_settings"
+    key = Column(String(255), primary_key=True)
+    value = Column(String(2000), nullable=False, default="")
+    created_at = Column(DateTime(timezone=True), nullable=True)
+    updated_at = Column(DateTime(timezone=True), nullable=True)
+
+
 class UserModel(Base):
     __tablename__ = "users"
     id = Column(_UuidStr, primary_key=True, default=lambda: str(uuid.uuid4()))

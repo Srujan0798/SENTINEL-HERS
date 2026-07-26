@@ -4,6 +4,7 @@ import os
 from fastapi import APIRouter, Depends, Header, HTTPException
 from sqlalchemy.orm import Session
 
+from src.backend.ai.settings import save_ai_settings
 from src.backend.db import get_db
 from src.backend.incidents.models import Incident
 from src.backend.seed.service import DEMO_EMAIL, ensure_demo_seed
@@ -104,12 +105,8 @@ async def seed_demo(
     if not x_seed_secret or x_seed_secret != secret:
         raise HTTPException(status_code=403, detail="Invalid seed secret")
 
-    if x_ai_provider:
-        os.environ["AI_PROVIDER"] = x_ai_provider
-    if x_openrouter_key:
-        os.environ["OPENROUTER_API_KEY"] = x_openrouter_key
-    if x_nvapi_key:
-        os.environ["NVAPI_KEY"] = x_nvapi_key
+    if x_ai_provider or x_openrouter_key or x_nvapi_key:
+        save_ai_settings(db, provider=x_ai_provider, openrouter_key=x_openrouter_key, nvapi_key=x_nvapi_key)
 
     try:
         return ensure_demo_seed(db)
