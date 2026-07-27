@@ -1,7 +1,10 @@
+import logging
 import math
 from datetime import datetime, timezone
 from typing import Any, Optional
 from uuid import UUID
+
+logger = logging.getLogger(__name__)
 
 from sqlalchemy import func
 from sqlalchemy.orm import Session
@@ -61,7 +64,7 @@ def _publish_event(team_id: str, event_type: str, payload: dict[str, Any]) -> No
         hub = get_hub()
         asyncio.create_task(hub.publish(team_id, event_type, payload))
     except Exception:
-        pass
+        logger.exception("Failed to publish real-time event %s for team %s", event_type, team_id)
 
 
 def _try_dispatch_notifications(
@@ -76,7 +79,7 @@ def _try_dispatch_notifications(
         from src.backend.notifications.service import dispatch_notification
         dispatch_notification(db, channel, recipient, subject, message, incident_id)
     except Exception:
-        pass
+        logger.exception("Failed to dispatch notification to %s via %s", recipient, channel)
 
 
 def _emit_timeline_event(
