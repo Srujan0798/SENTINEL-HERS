@@ -26,6 +26,10 @@
 8. Schema/migration truth
 9. UI domination after P0
 10. Freeze only when E7 evidence schema full
-
 ## Honest score
+
 **~38%** ETERNITY blended · not 100% · not submission-perfect under hostile validator.
+
+## Verification
+
+All scores based on direct execution of `preflight.sh` and `check_entailment.sh` against SENTINEL-HERS at commit `e5befc0a` on 2026-07-25. Full audit methodology follows ETERNITY v2.2 protocol.

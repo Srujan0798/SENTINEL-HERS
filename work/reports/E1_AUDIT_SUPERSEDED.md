@@ -32,7 +32,9 @@
 | RBAC (role enforcement) | Working | P0 bypass via registration | **FAKE** |
 | Demo credentials | demo@sentinel.io / Sentinel2026! | Works, but user is admin by default | **PARTIAL** |
 
-## Overall Honest Score
+## Verification
+
+All verdicts derived from direct execution of `preflight.sh`, `check_entailment.sh`, and `pytest -q --tb=no` against SENTINEL-HERS at commit `e5befc0a` on 2026-07-26. See HANDOFF.md for current verified state; this file is SUPERSEDED and retained for traceability only.
 
 **35% (BAND: THEATER)** — capped at 40% by ETERNITY L11 (Security P0 open)
 

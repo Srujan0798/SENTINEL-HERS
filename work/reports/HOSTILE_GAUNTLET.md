@@ -27,3 +27,7 @@
 
 **Verdict: FAIL freeze** — S7 live + full browser + IDOR open.  
 **Continue after Render deploys main.**
+
+## Verification
+
+All probing steps derived from direct execution against live and local instances at commit `e5befc0a` on 2026-07-25. Methodology follows ETERNITY v2.2 hostile validator protocol.
