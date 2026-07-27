@@ -25,7 +25,10 @@ jobs:
       - name: Run tests
         run: pytest -q -W ignore::DeprecationWarning --tb=short
         env:
-          DATABASE_URL: "sqlite:///./sentinel_test.db"
+          # Absolute path in a guaranteed-writable dir. The previous relative
+          # form (sqlite:///./sentinel_test.db) resolved against the process CWD,
+          # which produced "attempt to write a readonly database" on every run.
+          DATABASE_URL: "sqlite:////tmp/sentinel_test.db"
           JWT_SECRET: "ci-secret-key-long-enough-32ch!!"
           JWT_REFRESH_SECRET: "ci-refresh-long-enough-32ch!!"
           REDIS_URL: ""
