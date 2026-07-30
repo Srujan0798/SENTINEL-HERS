@@ -1,0 +1,10 @@
+repos:
+  - repo: local
+    hooks:
+      - id: os-setup-preflight
+        name: OS-Setup Preflight (FM-02/03/04/07/08/09/10/11/13/14)
+        entry: bash /Users/srujansai/Desktop/Adaptoid-OS/validators/preflight.sh
+        language: system
+        pass_filenames: false
+        always_run: true
+        stages: [pre-commit]
